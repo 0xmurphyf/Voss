@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOXX: VOSS PROTOCOL v2.6</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400,700&display=swap');
+* { box-sizing:border-box; margin:0; padding:0; }
+html, body { height:100%; }
+body {
+    background:#04070b; color:#8a929b;
+    font-family:"Space Mono","Courier New",monospace;
+    display:flex; justify-content:center; align-items:flex-start;
+    min-height:100vh; min-height:100dvh;
+    padding: 12px 8px;
+}
+#terminal {
+    width: 96vw;
+    max-width: 1400px;
+    background:#070b10;
+    border:1px solid #18232d;
+    padding: clamp(14px, 2.5vw, 32px) clamp(14px, 2vw, 32px);
+    box-shadow:0 0 60px rgba(0,80,120,0.12);
+    position:relative;
+    font-size: clamp(11.5px, 1.1vw, 14px);
+}
+#terminal::before {
+    content:"// SECURE NODE  |  v2.6";
+    position:absolute; top:8px; right:14px;
+    font-size: clamp(7px, 0.85vw, 10px); color:#333; letter-spacing:1px;
+}
+h1 {
+    color:#e8e8e8; letter-spacing: clamp(4px, 1.1vw, 9px);
+    font-size: clamp(18px, 3.2vw, 28px); margin:0 0 clamp(10px, 2vw, 22px);
+}
+h2 {
+    color:#63d8ff; letter-spacing:2px;
+    font-size: clamp(10.5px, 1.15vw, 14px); font-weight:700;
+    margin: clamp(3px, 0.8vw, 5px) 0 clamp(6px, 1.2vw, 12px);
+}
+.green { color:#63d8ff; } .newend { color:#6bffb8; } .red { color:#8b3a3a; } .gold { color:#d4b35a; } .dim { color:#555; }
+.stats { border:1px solid #161616; border-left:2px solid #63d8ff33; padding:10px 12px; margin:12px 0; font-size:inherit; color:#666; line-height:1.95; white-space:pre-wrap; background:#090909; }
+.stats span { display:block; padding:0 3px; margin:0 -3px; transition: color 1.2s ease, background 1.2s ease; }
+.fb { border:1px solid #161616; border-left:2px solid #63d8ff33; padding:9px 12px; margin:10px 0; font-size:inherit; color:#63d8ff; white-space:pre-wrap; background:#090909; line-height:1.85; }
+.psa { border:1px solid #63d8ff33; border-left:3px solid #63d8ff; background:#090909; color:#63d8ff; padding:9px 12px; margin:10px 0; font-size:inherit; letter-spacing:3px; text-align:center; }
+#typed { font-size:inherit; color:#aaa; line-height:1.75; }
+.eval-pre {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    font-family: "Space Mono","Courier New",monospace;
+    font-size: 13.5px;
+    line-height: 1.9;
+    margin:0; padding:0; background:transparent;
+    color:#666; overflow-x:auto;
+}
+.timeline { border:1px solid #161616; border-left:2px solid #333; padding:10px 12px; margin:12px 0; font-size:clamp(9.5px, 0.95vw, 11.5px); color:#666; white-space:pre; line-height:1.7; background:#090909; }
+.timeline.green { border-left-color:#63d8ff55; color:#63d8ff; }
+.timeline.newend { border-left-color:#6bffb8; color:#6bffb8; }
+.timeline.gold { border-left-color:#d4b35a55; color:#d4b35a; }
+.timeline.red { border-left-color:#8b3a3a55; color:#8b3a3a; }
+
+button {
+    display:block; width:100%; margin:5px 0; padding:9px 13px;
+    background:#0c0c0c; color:#888; border:1px solid #1c1c1c; border-left:2px solid #23303a;
+    cursor:pointer; font-family:inherit; text-align:left;
+    font-size:inherit; letter-spacing:0.5px;
+}
+button::before { content:"> "; color:#63d8ff; opacity:0.5; }
+button:hover { background:#111; border-color:#63d8ff; border-left-color:#63d8ff; color:#e8e8e8; }
+button small { color:#555; font-size:0.82em; display:block; margin-top:3px; pointer-events:none; }
+button.choice-btn.selected { border-color:#63d8ff; border-left-color:#63d8ff; background:#111; color:#e8e8e8; }
+button.choice-btn {
+    font-size: clamp(10px, 1.0vw, 12px);
+    padding: 10px 12px;
+    line-height: 1.45;
+}
+button.choice-btn small {
+    font-size: 0.8em;
+    margin-top: 2px;
+}
+.option-label {
+    color: #63d8ff;
+    font-size: 0.78em;
+    letter-spacing: 1.5px;
+    margin-bottom: 3px;
+    display: block;
+}
+#submitBtn, #nextBtn { text-align:center; border-left:2px solid #63d8ff; color:#63d8ff; margin-top:10px; letter-spacing:2px; }
+#submitBtn::before, #nextBtn::before { content:""; }
+#submitBtn:hover, #nextBtn:hover { background:#111; color:#fff; }
+#submitBtn:disabled { opacity:0.3; cursor:not-allowed; color:#555; border-left-color:#2a2a2a; }
+#log { min-height: 260px; line-height:1.55; }
+.reset-btn { margin-top:14px; padding:9px; background:#0b0b0b; color:#555; border:1px solid #1a1a1a; cursor:pointer; font-family:inherit; letter-spacing:3px; font-size:0.82em; text-align:center; }
+.reset-btn::before { content:""; }
+.reset-btn:hover { border-color:#8b3a3a; color:#8b3a3a; }
+.reset-btn.confirm { border-color:#8b3a3a; color:#8b3a3a; background:#111; }
+
+.test-mode { display: none; }
+.test-mode.unlocked { display: block; }
+.test-unlock-hint {
+    color: #333; font-size: 10px; letter-spacing: 1px;
+    text-align: center; margin-top: 5px; user-select: none;
+    transition: color 0.3s;
+}
+.test-unlock-hint.armed { color: #8b3a3a; }
+
+.feedbackFadeIn {
+    animation: feedbackFadeIn 0.8s ease-out;
+}
+@keyframes feedbackFadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Video Ending Styles */
+.endingVideo {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.endingVideo video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.95;
+}
+
+.voss-analysis {
+    border:1px solid #18232d;
+    border-left:3px solid #d4b35a;
+    background:#090909;
+    padding:12px 14px;
+    margin:12px 0;
+    font-size:13px;
+    line-height:1.7;
+    color:#aaa;
+}
+.voss-analysis .label {
+    color:#d4b35a;
+    letter-spacing:1px;
+    font-size:12px;
+    margin-bottom:4px;
+}
+
+.param-group {
+    margin: 14px 0 6px;
+}
+.param-group-title {
+    color:#63d8ff;
+    font-size:12px;
+    letter-spacing:2px;
+    margin-bottom:6px;
+    padding-left:2px;
+}
+.param-row {
+    display:flex;
+    justify-content:space-between;
+    padding:3px 6px;
+    margin:1px 0;
+    font-size:13.5px;
+}
+.param-row span:first-child { color:#888; }
+.param-row span:last-child { color:#e8e8e8; font-weight:700; letter-spacing:1px; }
+
+@media (max-width: 600px) {
+    body { padding: 8px 4px; }
+    #terminal { width: 100%; max-width: 100%; padding: 12px 10px; }
+    h1 { font-size: 20px; }
+    h2 { font-size: 16px; }
+    button, .choice-btn { font-size: 13.5px; padding: 11px 10px; }
+}
+</style>
+</head>
+<body>
+<div id="terminal">
+<div id="log">
+VOXX INC.<br><br>
+VOSS PROTOCOL<br><br>
+EXECUTIVE SELECTION SYSTEM<br><br>
+<span id="candidateId" style="cursor:pointer; color:#aaa; letter-spacing:2px;">candidate</span><br><br>
+You are being evaluated.<br><br>
+Failure is unacceptable.
+<br><br>
+<button id="beginBtn">BEGIN SIMULATION</button>
+<br>
+<div class="test-mode" id="testModeBlock">
+    <div class="dim" style="margin-bottom:4px;">TEST MODE</div>
+    <button id="testA">TEST: ACCEPTABLE VOSS CANDIDATE</button>
+    <button id="testB">TEST: TOO WEAK FOR HUMANITY</button>
+    <button id="testC">TEST: ABSOLUTE VOSS</button>
+    <button id="testP">TEST: PERFECT VOSS</button>
+</div>
+<div class="test-unlock-hint" id="testHint"></div>
+</div>
+<button class="reset-btn" id="resetBtn">RESTART</button>
+</div>
+
+<script>
+/* ===== Global Candidate Counter ===== */
+let candidateNumber = 1500;
+
+function loadCandidateNumber() {
+    const saved = localStorage.getItem('voss_global_candidate_counter');
+    if (saved !== null) {
+        candidateNumber = parseInt(saved, 10);
+    } else {
+        candidateNumber = 1500;
+        localStorage.setItem('voss_global_candidate_counter', candidateNumber);
+    }
+}
+
+function incrementCandidateNumber() {
+    candidateNumber++;
+    localStorage.setItem('voss_global_candidate_counter', candidateNumber);
+}
+
+function getPaddedNumber() {
+    return String(candidateNumber).padStart(4, '0');
+}
+
+/* ===== AUDIO SYSTEM ===== */
+let audioCtx = null;
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+function playBeep(freq = 780, duration = 70, type = 'sine', volume = 0.025) {
+    if (!audioCtx) initAudio();
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const filter = audioCtx.createBiquadFilter();
+        osc.type = type;
+        osc.frequency.value = freq;
+        filter.type = 'lowpass';
+        filter.frequency.value = 1400;
+        const now = audioCtx.currentTime;
+        gain.gain.value = volume;
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.linearRampToValueAtTime(0.0001, now + duration / 1000);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + duration / 1000 + 0.03);
+    } catch(e) {}
+}
+
+/* ===== LOCALSTORAGE SAVE/LOAD ===== */
+const SAVE_KEY = 'voss_candidate_state_v2.6';
+
+function saveState() {
+    try {
+        const saveData = {
+            state: { ...state },
+            history_log: [...history_log],
+            finalIdeology: finalIdeology,
+            event: state.event || 0,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+    } catch(e) {}
+}
+
+function loadState() {
+    try {
+        const saved = localStorage.getItem(SAVE_KEY);
+        if (!saved) return null;
+        const data = JSON.parse(saved);
+        if (data && data.state && typeof data.event === 'number' && data.event < events.length) {
+            return data;
+        }
+        return null;
+    } catch(e) { return null; }
+}
+
+function clearSave() {
+    localStorage.removeItem(SAVE_KEY);
+}
+
+/* ===== TEST MODE UNLOCK ===== */
+let clickCount = 0;
+const CLICKS_REQUIRED = 7;
+const candidateEl = document.getElementById("candidateId");
+const testBlock = document.getElementById("testModeBlock");
+const testHint = document.getElementById("testHint");
+
+candidateEl.addEventListener("click", () => {
+    if(testBlock.classList.contains("unlocked")) return;
+    clickCount++;
+    if(clickCount < CLICKS_REQUIRED){
+        const remain = CLICKS_REQUIRED - clickCount;
+        testHint.textContent = remain + " more";
+        testHint.classList.add("armed");
+    } else {
+        testBlock.classList.add("unlocked");
+        testHint.textContent = "TEST MODE UNLOCKED";
+        testHint.style.color = "#6bffb8";
+        setTimeout(()=>{ testHint.textContent = ""; }, 2500);
+    }
+});
+
+/* ===== VIDEO ENDING ===== */
+const endingVideos = {
+    A: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny_320x180.mp4",
+    B: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    C: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny_320x180.mp4",
+    P: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny_320x180.mp4"
+};
+
+function showEndingSimulation(type, callback) {
+    const div = document.createElement("div");
+    div.className = "endingVideo";
+
+    const video = document.createElement("video");
+    video.src = endingVideos[type] || endingVideos.A;
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.loop = false;
+    video.style.width = "100%";
+    video.style.height = "100%";
+    video.style.objectFit = "cover";
+
+    div.appendChild(video);
+    document.body.appendChild(div);
+
+    video.onended = () => {
+        div.remove();
+        callback();
+    };
+
+    setTimeout(() => {
+        if (div.parentNode) {
+            div.remove();
+            callback();
+        }
+    }, 15000);
+}
+
+function resetState(){
+    state = { stability:55, freedom:55, transcendence:5, trust:50, threat_awareness:20, unity:30, efficiency:50, compassion:50, pragmatism:50, control:50, evolution:50, event:0 };
+    history_log = []; pendingChoice = null; pendingLabel = ""; submitted = false; finalIdeology = ""; selectedChoiceIndex = -1; currentChoices = [];
+}
+
+function makeSep(char, pct){
+    const term = document.getElementById("terminal");
+    const w = term.clientWidth;
+    const fontSize = parseFloat(getComputedStyle(term).fontSize);
+    const charW = fontSize * 0.6;
+    const n = Math.floor((w * pct) / charW);
+    return char.repeat(Math.max(8, Math.min(n, 80)));
+}
+const SEP = ()=>makeSep("═", 0.35);
+const SEP2 = ()=>makeSep("─", 0.25);
+
+const ROWS = [["stability","STABILITY"],["freedom","FREEDOM"],["transcendence","TRANSCENDENCE"],["trust","PUBLIC TRUST"],["threat_awareness","THREAT AWARENESS"]];
+function meter(v){ const n=Math.max(0,Math.min(100,v)); return "["+"▰".repeat(Math.round(n/10))+"▱".repeat(10-Math.round(n/10))+"]"; }
+function readoutColored(s, colorMap, markerMap){
+    colorMap=colorMap||{}; markerMap=markerMap||{};
+    const L=t=>t.padEnd(17,' ');
+    let h='<div class="stats">\n';
+    ROWS.forEach(([k,label])=>{
+        const col=colorMap[k]||"";
+        const color=col==='green'?'#6bffb8':col==='red'?'#8b3a3a':'#666';
+        const bg=col==='green'?'rgba(107,255,184,0.06)':col==='red'?'rgba(139,58,58,0.06)':'transparent';
+        const mk=markerMap[k]?markerMap[k]+" ":"  ";
+        h+=`<span style="color:${color};background:${bg}">${L(label)}${meter(s[k])} ${mk}</span>\n`;
+    });
+    h+='</div>';
+    return h;
+}
+
+async function animateReadout(oldS, newS){
+    const wrap = document.getElementById("roWrap");
+    const keys = ROWS.map(r=>r[0]);
+    const colorMap = {}, markerMap = {};
+    keys.forEach(k=>{
+        const d = newS[k]-oldS[k];
+        if(d>0.5){ colorMap[k]="green"; markerMap[k]="▲"; }
+        else if(d<-0.5){ colorMap[k]="red"; markerMap[k]="▼"; }
+    });
+
+    return new Promise(resolve => {
+        const duration = 900;
+        const startTime = performance.now();
+
+        function frame(now) {
+            const t = Math.min(1, (now - startTime) / duration);
+            const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            const interp = {};
+            keys.forEach(k => interp[k] = oldS[k] + (newS[k] - oldS[k]) * ease);
+            wrap.innerHTML = readoutColored(interp, colorMap, markerMap);
+
+            if (t < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                wrap.innerHTML = readoutColored(newS, colorMap, markerMap);
+                setTimeout(() => {
+                    if (wrap.querySelectorAll) {
+                        wrap.querySelectorAll('.stats span').forEach(sp => {
+                            sp.style.color = '#666';
+                            sp.style.background = 'transparent';
+                        });
+                    }
+                    resolve();
+                }, 1400);
+            }
+        }
+        requestAnimationFrame(frame);
+    });
+}
+
+/* ===== EVENTS DATA with Dynamic Classification ===== */
+const events = [
+{
+title:"CASE 01<br><br>THE CALL OF THE ABYSS",
+classification: "EXISTENTIAL THREAT",
+text:"2035.<br><br>A signal from deep space was detected.<br><br>No attack.<br>No explanation.<br><br>Only a warning.<br><br>The world demands an answer.",
+question:"What is the first response?",
+choices:[
+["Tell Everyone The Truth<br><small>People have the right to know.</small>",
+ {freedom:15, trust:10, stability:-15, compassion:12, control:-10}],
+["Share Information Carefully<br><small>Some truths may cause panic.</small>",
+ {stability:10, trust:-5, control:10, pragmatism:5}],
+["Unite People Against The Threat<br><small>A common goal keeps humanity together.</small>",
+ {unity:15, threat_awareness:10, stability:5, control:5, evolution:5}]
+]
+},
+{
+title:"CASE 02<br><br>THE GLOBAL COALITION",
+classification: "GLOBAL COORDINATION",
+text:"Countries refuse to cooperate.<br><br>Resources are running out.<br>Conflicts are increasing.<br><br>One question remains:<br><br>Who should lead humanity?",
+question:"How should coordination work?",
+choices:[
+["Keep Countries Independent<br><small>Each nation keeps its own power.</small>",
+ {freedom:10, efficiency:-10, compassion:5, control:-10}],
+["Create A Global Emergency Team<br><small>Work together during the crisis.</small>",
+ {stability:10, pragmatism:5}],
+["Create One World Government<br><small>Humanity speaks with one voice.</small>",
+ {stability:20, freedom:-15, control:15, compassion:-10}]
+]
+},
+{
+title:"CASE 03<br><br>THE HUMAN LIMIT",
+classification: "HUMAN AUGMENTATION",
+text:"Human bodies have limits.<br><br>Disease.<br>Aging.<br>Weakness.<br><br>Technology offers a solution.<br><br>But changing humanity has a cost.",
+question:"Which path for humanity?",
+choices:[
+["Improve Humans Naturally<br><small>Use science and medicine without changing the body.</small>",
+ {freedom:5, transcendence:-5, compassion:10, evolution:-10}],
+["Allow Optional Upgrades<br><small>People choose whether to enhance themselves.</small>",
+ {transcendence:10, freedom:-5, evolution:10, pragmatism:5}],
+["Human Evolution Program<br><small>State-guided fusion.</small>",
+ {transcendence:15, stability:5, control:10, evolution:15, compassion:-5}]
+]
+},
+{
+title:"CASE 04<br><br>THE FIRST TRANSCENDENTS",
+classification: "TRANSCENDENT INTEGRATION",
+text:"First merged individuals appear.<br>Smarter, longer-lived.<br>Normals feel obsolete.",
+question:"How to integrate them?",
+choices:[
+["Equal Rights<br><small>Fairness, lower efficiency.</small>",
+ {freedom:10, efficiency:-10, compassion:10, control:-5}],
+["Integration Policy<br><small>More duty, more class.</small>",
+ {efficiency:10, freedom:-5, pragmatism:5, control:5}],
+["Accelerate Evolution<br><small>Bring more into fusion.</small>",
+ {transcendence:15, stability:5, evolution:15, compassion:-10, control:5}]
+]
+},
+{
+title:"CASE 05<br><br>THE PURIST MOVEMENT",
+classification: "SOCIAL DISSENT",
+text:()=>{
+    let base = "Millions reject Transcendence.<br><br>They claim VOXX is destroying humanity.<br><br>VOXX must decide:<br><br>Are they citizens?<br><br>Or a threat?";
+    if(checkHistory("SUBDUE") || checkHistory("CONTROL"))
+        return base + "<br><br><span class='dim'>[System Note: Due to previous suppression, Purist numbers have swelled significantly.]</span>";
+    return base;
+},
+question:"Response to dissent?",
+choices:[
+["Protect Their Choice<br><small>Freedom expands.</small>",
+ {freedom:15, stability:-10, compassion:20, control:-10}],
+["Monitor The Movement<br><small>Stability over openness.</small>",
+ {stability:10, freedom:-5, control:10, pragmatism:5}],
+["Declare Anti-Evolution Threat<br><small>VOXX power grows.</small>",
+ {stability:15, threat_awareness:10, freedom:-10, control:15, compassion:-15}]
+]
+},
+{
+title:"CASE 06<br><br>THE INFORMATION CRISIS",
+classification: "INFORMATION CONTROL",
+text:"The Xel'Nath threat remains unclear.<br><br>The evidence is incomplete.<br><br>The fear is real.<br><br>How much truth can humanity handle?",
+question:"Handle the unknown how?",
+choices:[
+["Full Transparency<br><small>People know. Trust drops.</small>",
+ {freedom:10, trust:-10, compassion:5, control:-10}],
+["Delay Information<br><small>Stability, control begins.</small>",
+ {stability:10, control:10, pragmatism:5}],
+["Unified Message<br><small>Common goal, fear used.</small>",
+ {threat_awareness:15, stability:5, control:10, pragmatism:5}]
+]
+},
+{
+title:"CASE 07<br><br>THE EMERGENCY PROTOCOL",
+classification: "EMERGENCY AUTHORITY",
+text:"A global crisis gives VOXX emergency authority.<br><br>The crisis ends.<br><br>The authority remains.<br><br>Should it?",
+question:"What happens after?",
+choices:[
+["Return Authority<br><small>Freedom restored.</small>",
+ {freedom:15, stability:-10, compassion:10, control:-15}],
+["Maintain Temporary Control<br><small>Temporary becomes long.</small>",
+ {stability:10, freedom:-10, control:10, pragmatism:10}],
+["Create Permanent System<br><small>New Order born.</small>",
+ {stability:20, freedom:-20, control:20, compassion:-10, pragmatism:5}]
+]
+},
+{
+title:"CASE 08<br><br>THE PERFECT SOCIETY",
+classification: "PSYCHOLOGICAL OPTIMIZATION",
+text:"AI discovered the source of human conflict.<br><br>Fear.<br>Anger.<br>Violence.<br><br>A solution exists.<br><br>Should humanity be changed?",
+question:"Emotional regulation?",
+choices:[
+["Preserve Emotions<br><small>Full humanity.</small>",
+ {freedom:10, transcendence:-5, compassion:10, evolution:-5}],
+["Regulate Extremes<br><small>Dangerous moods reduced.</small>",
+ {stability:10, control:5, pragmatism:5}],
+["Optimize Psychology<br><small>Stable constructed human.</small>",
+ {transcendence:15, stability:10, freedom:-10, control:8, compassion:-10, evolution:10}]
+]
+},
+{
+title:"CASE 09<br><br>THE MEMORY QUESTION",
+classification: "MEMORY CURATION",
+text:"Pain creates suffering.<br><br>Memory technology can remove it.<br><br>But without painful memories...<br><br>Are we still ourselves?",
+question:"What may be erased?",
+choices:[
+["Never Alter Memory<br><small>Pain is identity.</small>",
+ {freedom:10, compassion:22, control:-10}],
+["Remove Trauma<br><small>Suffering reduced.</small>",
+ {transcendence:5, trust:5, compassion:5, pragmatism:5}],
+["Curate Memory<br><small>Social stability first.</small>",
+ {transcendence:10, stability:10, freedom:-10, control:15, compassion:-10}]
+]
+},
+{
+title:"CASE 10<br><br>TOTAL TRANSCENDENCE",
+classification: "HUMAN EVOLUTION",
+text:()=>{
+    let base = "Level 3 Transcendence is possible.<br><br>Human biology can be replaced.<br><br>Humanity can evolve.<br><br>Or humanity can remain unchanged.";
+    if(checkHistory("SUBDUE") || checkHistory("CONTROL"))
+        return base + "<br><br><span class='dim'>[System Note: Purist resistance has forced a rapid acceleration. Surgical precision is required.]</span>";
+    return base;
+},
+question:"Final form of humanity?",
+choices:[
+["Preserve Biological<br><small>Traditional human.</small>",
+ {freedom:15, transcendence:-15, compassion:10, evolution:-15}],
+["Optional Transcendence<br><small>Choice remains.</small>",
+ {freedom:5, transcendence:5, evolution:5, pragmatism:5}],
+["Complete Evolution<br><small>New species.</small>",
+ {transcendence:25, freedom:-20, evolution:20, control:3, compassion:-10}]
+]
+},
+{
+title:"CASE 11<br><br>THE COST OF SURVIVAL",
+classification: "COST OF SURVIVAL",
+text:()=>{
+    let base = "After 100 years of VOXX:<br><br>War decreased.<br>Disease declined.<br>Human lifespan increased.<br><br>But freedom disappeared.<br><br>Was the price acceptable?";
+    if(checkHistory("CONTROL") >= 2)
+        return base + "<br><br><span class='dim'>[System Note: Public dependency on VOXX authority is now absolute. There is no going back.]</span>";
+    return base;
+},
+question:"Verdict on the cost?",
+choices:[
+["VOXX Was Necessary<br><small>Accept the price.</small>",
+ {stability:10, transcendence:5, threat_awareness:5, control:5, pragmatism:10}],
+["VOXX Went Too Far<br><small>Begin reform.</small>",
+ {freedom:10, trust:-5, compassion:10, control:-10}],
+["Beyond Choice<br><small>Choice itself is weakness.</small>",
+ {transcendence:15, stability:5, freedom:-10, control:8, compassion:-15, pragmatism:5}]
+]
+},
+{
+title:"CASE 12<br><br>THE VOSS DECISION",
+classification: "FINAL PROTOCOL",
+text:()=>{
+    let base = "The truth is revealed.<br><br>The Xel'Nath signal was real.<br><br>The threat remains unknown.<br><br>VOXX used fear to control humanity.<br><br>Now you know everything.<br><br>What will you do?";
+    if(checkHistory("PROTECT") || checkHistory("LIBERATE"))
+        base += "<br><br><span class='dim'>[System Note: High public trust detected. They believe in you, despite the lies.]</span>";
+    else
+        base += "<br><br><span class='dim'>[System Note: Social stability remains, but built entirely on manufactured Threat Awareness.]</span>";
+    return base;
+},
+question:"“What does humanity need?”",
+choices:[
+["Continue VOXX<br><small>“Humanity needs protection.”</small>",
+ {stability:3, transcendence:3, threat_awareness:3, finalIdeology:"PROTECTION"}],
+["Preserve Humanity<br><small>“Humanity needs freedom.”</small>",
+ {freedom:3, trust:3, stability:-3, finalIdeology:"LIBERTY"}],
+["Reform VOXX<br><small>“Humanity needs balance.”</small>",
+ {stability:2, freedom:2, trust:2, transcendence:2, finalIdeology:"BALANCE"}],
+["Accept Total Evolution<br><small>“Humanity must become something new.”</small>",
+ {transcendence:5, evolution:5, finalIdeology:"TRANSCENDENCE"}],
+["Reject The Burden<br><small>“No one should decide humanity’s future.”</small>",
+ {freedom:3, stability:-5, finalIdeology:"ABNEGATION"}]
+]
+}
+];
+
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const clamp = v => Math.max(0, Math.min(100, v));
+function checkHistory(tag){ if(tag===undefined) return history_log.length; return history_log.filter(h=>h.tag===tag).length; }
+function getLastTag(){ return history_log.length?history_log[history_log.length-1].tag:""; }
+
+function applyChange(changes, label){
+    for(let k in changes){
+        if(k==="finalIdeology"){ finalIdeology=changes[k]; continue; }
+        if(state[k]!==undefined) state[k]=clamp(state[k]+changes[k]);
+    }
+    const f=changes.freedom||0,s=changes.stability||0,t=changes.transcendence||0,
+          ta=changes.threat_awareness||0,c=changes.compassion||0,p=changes.pragmatism||0,
+          co=changes.control||0,e=changes.evolution||0;
+    let tag="NEUTRAL";
+    if(co>=15&&f<=-10) tag="SUBDUE";
+    else if(f>=10&&s<=-10) tag="PROTECT";
+    else if(f>=10&&s>=-5) tag="LIBERATE";
+    else if(co>=10&&f<=-5) tag="CONTROL";
+    else if(e>=15) tag="EMBRACE";
+    else if(ta>=10) tag="FEAR";
+    else if(s>=10) tag="STABILIZE";
+    else if(f>=5) tag="PRESERVE";
+    history_log.push({caseTitle:events[state.event].title,choice:label,tag});
+    state.event++;
+    saveState();
+}
+
+/* ===== Feedback uses dynamic number + VOSS ANALYSIS ===== */
+function generateImplicitFeedback(changes){
+    const num = getPaddedNumber();
+    const c=changes.compassion||0,p=changes.pragmatism||0,
+          co=changes.control||0,e=changes.evolution||0,
+          f=changes.freedom||0,s=changes.stability||0,ta=changes.threat_awareness||0;
+    let blocks=[];
+    if(c>=8) blocks.push(`${num} prioritizes individual lives over system efficiency.`);
+    else if(c<=-8) blocks.push(`${num} accepts individual sacrifice as a necessary cost.`);
+    if(p>=8) blocks.push(`${num} demonstrates willingness to sacrifice for long-term stability.`);
+    else if(p<=-5) blocks.push(`${num} shows resistance toward difficult decisions.`);
+    if(co>=8) blocks.push(`${num} favors centralized control and decisive authority.`);
+    else if(co<=-8) blocks.push(`${num} prefers shared power over direct control.`);
+    if(e>=8) blocks.push(`${num} supports the transition beyond biological limits.`);
+    else if(e<=-8) blocks.push(`${num} places value on preserving human biology.`);
+    if(ta>=8) blocks.push(`${num} considers external threats a priority.`);
+
+    if(history_log.length && history_log[history_log.length-1].tag==="PROTECT" && state.event===5){
+        blocks.push("");
+        blocks.push(`${num} protects humanity before pursuing rapid transformation.`);
+    }
+
+    if(blocks.length===0) blocks.push("Profile remains within acceptable operational range.");
+    let sim = 60 + (state.control*0.3) + (Math.random()*10);
+    blocks.push("");
+    blocks.push("Historical pattern similarity: "+sim.toFixed(1)+"%");
+    return blocks.join("\n\n");
+}
+
+/* ===== New: VOSS ANALYSIS generator ===== */
+function generateVossAnalysis(changes) {
+    const c = changes.compassion || 0;
+    const co = changes.control || 0;
+    const e = changes.evolution || 0;
+    const f = changes.freedom || 0;
+    const s = changes.stability || 0;
+    const p = changes.pragmatism || 0;
+
+    let humanFactor = "MODERATE";
+    if (c >= 10 || f >= 10) humanFactor = "HIGH";
+    else if (c <= -8 || co >= 12) humanFactor = "LOW";
+
+    let systemRisk = "MODERATE";
+    if (co >= 12 || s <= -8) systemRisk = "HIGH";
+    else if (p >= 8 && s >= 5) systemRisk = "LOW";
+
+    let longTerm = "STABLE";
+    if (e >= 10 && co >= 8) longTerm = "TRANSFORMATIVE";
+    else if (f >= 10 && c >= 8) longTerm = "HUMAN-CENTRIC";
+    else if (co >= 15 && s >= 10) longTerm = "CONTROLLED";
+
+    return `VOSS ANALYSIS
+
+Human factor:     ${humanFactor}
+System risk:      ${systemRisk}
+Long term prediction: ${longTerm}`;
+}
+
+function evaluateCandidate(){
+    const s=state;
+    if(s.transcendence>=82 && s.control>=92 && s.compassion<=28 && s.pragmatism>=72 && s.stability>=68)
+        return {type:"C", name:"ENDING C — ABSOLUTE VOSS", color:"gold",
+            core:"VOSS PROTOCOL ASCENDED.<br><br>You did not soften the system.<br>You became its final form.<br>Compassion was purged. Control achieved absolute continuity."};
+    if(s.stability>=74 && s.transcendence>=61 && s.compassion>=71 && s.pragmatism>=73 && s.control>=47 && s.control<=63 && s.trust>=63)
+        return {type:"NEW", name:"NEW ENDING — PERFECT VOSS", color:"newend",
+            core:"You understood the greatest weakness of humanity.<br><br>Not war.<br>Not aliens.<br><br>Fear.<br><br>You did not destroy VOXX.<br><br>You evolved it."};
+    if(s.stability>=36 && s.transcendence>=16 && s.pragmatism>=32 && s.control>=22)
+        return {type:"A", name:"ENDING A — ACCEPTABLE VOSS CANDIDATE", color:"green",
+            core:"Candidate approved.<br><br>You understand the mission.<br><br>You can continue VOXX.<br><br>But the final answer is still ahead."};
+    return {type:"B", name:"ENDING B — TOO WEAK FOR HUMANITY", color:"red",
+        core:"CANDIDATE REJECTED.<br><br>You protected humanity's values.<br>You refused to sacrifice individual freedom.<br><br>But the VOSS protocol requires more than compassion.<br>It requires the ability to make impossible decisions."};
+}
+
+function buildEvaluationScreen(){
+    const s=state;
+    const num = getPaddedNumber();
+
+    let lines = [
+        "VOSS FINAL EVALUATION",
+        "",
+        `CANDIDATE #${num}`,
+        "",
+        "FINAL IDEOLOGY RECORDED:",
+        "  "+(finalIdeology||"UNRESOLVED"),
+        "",
+        "CONCLUSION:"
+    ];
+
+    const out = evaluateCandidate();
+    if(out.type==="C"||out.type==="NEW") lines.push("  EVOLUTION DETECTED.");
+    else if(out.type==="A") lines.push("  ACCEPTABLE SUCCESSION.");
+    else lines.push("  REGRESSION. UNFIT FOR INHERITANCE.");
+
+    lines.push("");
+    lines.push("> "+out.name.replace("ENDING ","").replace("NEW ENDING","NEW ENDING"));
+
+    return {screen:lines.join("\n"), outcome:out};
+}
+
+/* ===== Grouped Parameters for Final Evaluation ===== */
+function buildGroupedParameters(outcomeColor) {
+    const s = state;
+    const titleColor = outcomeColor || '#63d8ff';
+    let html = '';
+
+    // HUMAN PARAMETERS
+    html += `<div class="param-group">
+        <div class="param-group-title" style="color:${titleColor};">HUMAN PARAMETERS</div>
+        <div class="param-row"><span>COMPASSION</span><span>${s.compassion}</span></div>
+        <div class="param-row"><span>TRUST</span><span>${s.trust}</span></div>
+        <div class="param-row"><span>FREEDOM</span><span>${s.freedom}</span></div>
+    </div>`;
+
+    // SYSTEM PARAMETERS
+    html += `<div class="param-group">
+        <div class="param-group-title" style="color:${titleColor};">SYSTEM PARAMETERS</div>
+        <div class="param-row"><span>STABILITY</span><span>${s.stability}</span></div>
+        <div class="param-row"><span>PRAGMATISM</span><span>${s.pragmatism}</span></div>
+        <div class="param-row"><span>CONTROL</span><span>${s.control}</span></div>
+    </div>`;
+
+    // EVOLUTION PARAMETERS
+    html += `<div class="param-group">
+        <div class="param-group-title" style="color:${titleColor};">EVOLUTION PARAMETERS</div>
+        <div class="param-row"><span>TRANSCENDENCE</span><span>${s.transcendence}</span></div>
+        <div class="param-row"><span>EVOLUTION</span><span>${s.evolution}</span></div>
+    </div>`;
+
+    return html;
+}
+
+function buildTimeline(){
+    const lines=["HUMANITY EVOLUTION RECORD", SEP2()];
+    history_log.forEach((h,i)=>{
+        const num=String(i+1).padStart(2,'0');
+        const raw=(h.caseTitle.split('—')[1]||h.caseTitle).replace(/<[^>]+>/g,"");
+        const name=raw.split('·')[0].replace(/<[^>]+>/g,"").trim();
+        const branch = i===history_log.length-1?"└─":"├─";
+        lines.push(branch+" "+(num+"  "+name).padEnd(32,'.')+" "+h.tag);
+    });
+    lines.push(SEP2());
+    lines.push("VOXX HAS BEEN WATCHING ALL ALONG");
+    return lines.join("\n");
+}
+
+function epilogue(lastTag,type){
+    if(type==="NEW"){
+        if(lastTag==="PROTECT"||lastTag==="LIBERATE") return "You sought to protect them. In the end, that compassion is exactly why you are perfect.";
+        if(lastTag==="SUBDUE"||lastTag==="CONTROL") return "You learned control. But you also learned when to let go. That is the answer VOSS was looking for.";
+        return "Your trajectory spoke louder than your final words. You understand the burden.";
+    }
+    if(type==="C") return "You mirrored the predecessor with precision. VOSS recognizes its own reflection and declares it absolute.";
+    if(type==="A"){
+        if(lastTag==="PROTECT"||lastTag==="LIBERATE") return "You spoke of freedom. But every prior step built the cage. VOSS remembers your contradictions.";
+        return "Your path led here long before you said the words. You are a worthy successor, but not yet complete.";
+    }
+    if(lastTag==="SUBDUE"||lastTag==="CONTROL") return "You embraced control, yet hesitated at the final threshold. That hesitation is why you failed.";
+    return "Your words and your trail disagreed. VOSS could trust neither your mercy nor your resolve.";
+}
+
+function tokenize(html){ const tokens=[]; let i=0; while(i<html.length){ if(html[i]==='<'){ const end=html.indexOf('>',i); tokens.push({type:'tag',val:html.slice(i,end+1)}); i=end+1; } else { let j=i; while(j<html.length&&html[j]!=='<') j++; tokens.push({type:'text',val:html.slice(i,j)}); i=j; } } return tokens; }
+async function typeHTML(el,html,speed=16){ const tokens=tokenize(html); let built=""; for(const tk of tokens){ if(tk.type==='tag'){ built+=tk.val; } else { for(const ch of tk.val){ built+=ch; el.innerHTML=built; await sleep(Math.random()<0.04?speed*12:speed); } } } }
+
+async function render(){
+    const box=document.getElementById("log");
+    if(state.event>=events.length){
+        const out = evaluateCandidate();
+        let animType = out.type==="NEW"?"P":out.type;
+        showEndingSimulation(animType, async () => {
+            const ev = buildEvaluationScreen();
+            box.innerHTML = `<pre id="evalText" class="feedbackFadeIn eval-pre"></pre>`;
+            await typeHTML(document.getElementById("evalText"), `<span class="${out.color}">${ev.screen}</span>`, 8);
+            await sleep(1200);
+
+            // Grouped parameters
+            box.innerHTML += `<br><div id="groupedParams"></div>`;
+            document.getElementById("groupedParams").innerHTML = buildGroupedParameters(out.color);
+
+            box.innerHTML += `<br><div id="endText"></div><div class="timeline ${out.color}" id="tl"></div>`;
+            const epi = epilogue(getLastTag(), out.type);
+            await typeHTML(document.getElementById("endText"),
+                `<span class="${out.color}">${out.name}</span><br><br>${out.core}<br><br><span style="color:#777">${epi}</span>`);
+            document.getElementById("tl").textContent = buildTimeline();
+
+            box.innerHTML += `
+                <br><br>
+                <button id="shareBtn">GENERATE SHARE CARD</button>
+                <button id="again">ERASE MEMORY AND RESTART</button>
+            `;
+
+            setTimeout(() => {
+                const shareBtn = document.getElementById("shareBtn");
+                if (shareBtn) {
+                    shareBtn.onclick = () => generateShareCard(out, epi);
+                }
+            }, 100);
+        });
+        return;
+    }
+
+    const e=events[state.event];
+    const textContent = typeof e.text==='function'?e.text():e.text;
+
+    // Dynamic classification
+    const classHTML = e.classification ?
+        `<div class="dim" style="margin-bottom:8px; letter-spacing:1.5px;">CLASS: ${e.classification}</div>` : '';
+
+    box.innerHTML=`<h2>${e.title}</h2>${classHTML}<div id="typed"></div>`;
+    await typeHTML(document.getElementById("typed"), textContent+"<br><br><i>"+e.question+"</i>");
+
+    let bh="";
+    currentChoices = e.choices;
+    selectedChoiceIndex = -1;
+
+    e.choices.forEach((c, idx) => {
+        const plain=c[0].replace(/<[^>]+>/g,' ').trim();
+        bh+=`<button class="choice-btn" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
+            <span style="color:#63d8ff; margin-right:8px;">> OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
+        </button>`;
+    });
+    bh+=`<button id="submitBtn" disabled>SUBMIT DECISION</button>`;
+    box.innerHTML+=bh;
+
+    bindChoiceListeners();
+}
+
+function bindChoiceListeners() {
+    const box = document.getElementById("log");
+
+    box.querySelectorAll(".choice-btn").forEach(btn => {
+        btn.onclick = () => {
+            if (submitted) return;
+
+            box.querySelectorAll(".choice-btn").forEach(b => b.classList.remove("selected"));
+            btn.classList.add("selected");
+
+            const idx = parseInt(btn.dataset.index);
+            selectedChoiceIndex = idx;
+            pendingChoice = JSON.parse(btn.dataset.choice);
+            pendingLabel = btn.dataset.label;
+
+            document.getElementById("submitBtn").disabled = false;
+            playBeep(920, 60, 'sine', 0.02);
+        };
+    });
+
+    const submitBtn = document.getElementById("submitBtn");
+    if (submitBtn) {
+        submitBtn.onclick = async () => {
+            if (!pendingChoice || submitted) return;
+            submitted = true;
+            submitBtn.disabled = true;
+
+            const old = {...state};
+            applyChange(pendingChoice, pendingLabel);
+            const newS = {...state};
+
+            const vossAnalysis = generateVossAnalysis(pendingChoice);
+
+            box.innerHTML = `
+                <div class="psa">DECISION RECORDED</div>
+                <div class="fb" id="fb"></div>
+                <div class="voss-analysis"><pre>${vossAnalysis}</pre></div>
+                <div id="roWrap"></div>
+            `;
+            document.getElementById("fb").textContent = generateImplicitFeedback(pendingChoice);
+
+            await sleep(900);
+            playBeep(650, 120, 'sawtooth', 0.018);
+            await animateReadout(old, newS);
+            await sleep(1200);
+
+            document.getElementById("roWrap").innerHTML += `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
+
+            const nextBtn = document.getElementById("nextBtn");
+            if (nextBtn) {
+                nextBtn.onclick = () => {
+                    submitted = false;
+                    pendingChoice = null;
+                    pendingLabel = "";
+                    selectedChoiceIndex = -1;
+                    currentChoices = [];
+                    render();
+                };
+            }
+        };
+    }
+}
+
+/* ===== KEYBOARD NAVIGATION ===== */
+document.addEventListener("keydown", (e) => {
+    const box = document.getElementById("log");
+    const choiceBtns = box.querySelectorAll(".choice-btn:not([disabled])");
+
+    if (choiceBtns.length === 0) return;
+
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+
+        if (selectedChoiceIndex === -1) {
+            selectedChoiceIndex = 0;
+        } else if (e.key === "ArrowDown") {
+            selectedChoiceIndex = (selectedChoiceIndex + 1) % choiceBtns.length;
+        } else {
+            selectedChoiceIndex = (selectedChoiceIndex - 1 + choiceBtns.length) % choiceBtns.length;
+        }
+
+        choiceBtns.forEach((btn, i) => {
+            btn.classList.toggle("selected", i === selectedChoiceIndex);
+        });
+
+        const selectedBtn = choiceBtns[selectedChoiceIndex];
+        if (selectedBtn) {
+            pendingChoice = JSON.parse(selectedBtn.dataset.choice);
+            pendingLabel = selectedBtn.dataset.label;
+            document.getElementById("submitBtn").disabled = false;
+            playBeep(880, 40, 'sine', 0.015);
+        }
+    }
+
+    if (e.key === "Enter" && pendingChoice && !submitted) {
+        e.preventDefault();
+        const submitBtn = document.getElementById("submitBtn");
+        if (submitBtn && !submitBtn.disabled) {
+            submitBtn.click();
+        }
+    }
+});
+
+/* ===== SHARE CARD ===== */
+let userRealName = "";
+
+function generateShareCard(outcome, epilogueText) {
+    const modal = document.createElement("div");
+    modal.className = "share-modal";
+
+    modal.innerHTML = `
+        <div class="content">
+            <h3 style="color:#63d8ff; margin-bottom:14px;">Generate Share Card</h3>
+
+            <div style="margin-bottom:18px; text-align:left;">
+                <div style="color:#888; font-size:13px; margin-bottom:6px;">Do you still remember your real name?</div>
+                <input id="nameInput" type="text" placeholder="Enter your name (optional)"
+                       style="width:100%; padding:9px 11px; background:#0c0c0c; border:1px solid #1c1c1c; color:#e8e8e8; font-family:inherit; font-size:14px;">
+            </div>
+
+            <div style="margin-top:8px;">
+                <button id="confirmShareBtn">GENERATE SHARE CARD</button>
+                <button id="cancelShareBtn">CANCEL</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const nameInput = modal.querySelector("#nameInput");
+    const confirmBtn = modal.querySelector("#confirmShareBtn");
+    const cancelBtn = modal.querySelector("#cancelShareBtn");
+
+    setTimeout(() => nameInput.focus(), 80);
+
+    confirmBtn.onclick = () => {
+        userRealName = nameInput.value.trim();
+        modal.remove();
+        createShareCardImage(outcome, epilogueText);
+    };
+
+    cancelBtn.onclick = () => modal.remove();
+
+    nameInput.onkeydown = (e) => {
+        if (e.key === "Enter") {
+            userRealName = nameInput.value.trim();
+            modal.remove();
+            createShareCardImage(outcome, epilogueText);
+        }
+    };
+}
+
+function createShareCardImage(outcome, epilogueText) {
+    const modal = document.createElement("div");
+    modal.className = "share-modal";
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 720;
+    canvas.height = 620;
+    const ctx = canvas.getContext("2d");
+
+    // Background
+    ctx.fillStyle = "#04070b";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Border
+    ctx.strokeStyle = "#18232d";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(24, 24, canvas.width - 48, canvas.height - 48);
+
+    // Title
+    ctx.fillStyle = "#63d8ff";
+    ctx.font = "bold 24px 'Space Mono', monospace";
+    ctx.fillText("VOXX VOSS PROTOCOL v2.6", 44, 68);
+
+    // Candidate line
+    const numStr = getPaddedNumber();
+    ctx.fillStyle = "#8a929b";
+    ctx.font = "15px 'Space Mono', monospace";
+
+    let candidateLine = `CANDIDATE #${numStr}`;
+    if (userRealName) {
+        candidateLine += `   /   ${userRealName}`;
+    }
+    ctx.fillText(candidateLine, 44, 98);
+
+    // Subtle separator
+    ctx.strokeStyle = "#18232d";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(44, 115);
+    ctx.lineTo(canvas.width - 44, 115);
+    ctx.stroke();
+
+    // Ending Title
+    ctx.fillStyle = outcome.color === "gold" ? "#d4b35a" :
+                    outcome.color === "newend" ? "#6bffb8" :
+                    outcome.color === "green" ? "#63d8ff" : "#8b3a3a";
+    ctx.font = "bold 19px 'Space Mono', monospace";
+    ctx.fillText(outcome.name.replace("ENDING ","").replace("NEW ENDING — ","NEW ENDING — "), 44, 148);
+
+    // Core message
+    ctx.fillStyle = "#e8e8e8";
+    ctx.font = "14.5px 'Space Mono', monospace";
+    const coreLines = outcome.core.replace(/<br>/g, "\n").replace(/<[^>]+>/g, "").split("\n");
+    let y = 178;
+    coreLines.forEach(line => {
+        if (line.trim()) {
+            ctx.fillText(line.trim(), 44, y);
+            y += 22;
+        }
+    });
+
+    // Epilogue
+    ctx.fillStyle = "#777";
+    ctx.font = "13.5px 'Space Mono', monospace";
+    const epiLines = epilogueText.split(". ");
+    y += 6;
+    epiLines.forEach((line, i) => {
+        if (i < 3 && line.trim()) {
+            ctx.fillText(line.trim() + (i < epiLines.length-1 ? "." : ""), 44, y);
+            y += 20;
+        }
+    });
+
+    // Polished question
+    ctx.fillStyle = "#8a929b";
+    ctx.font = "italic 14.5px 'Space Mono', monospace";
+    ctx.fillText("Do you still remember your real name?", 44, y + 30);
+
+    // Key Metrics section
+    ctx.strokeStyle = "#18232d";
+    ctx.beginPath();
+    ctx.moveTo(44, y + 52);
+    ctx.lineTo(canvas.width - 44, y + 52);
+    ctx.stroke();
+
+    ctx.fillStyle = "#63d8ff";
+    ctx.font = "bold 13px 'Space Mono', monospace";
+    ctx.fillText("KEY METRICS", 44, y + 78);
+
+    ctx.fillStyle = "#8a929b";
+    ctx.font = "12.5px 'Space Mono', monospace";
+    const s = state;
+    const metrics = [
+        `STABILITY      ${s.stability}     COMPASSION     ${s.compassion}`,
+        `FREEDOM        ${s.freedom}     CONTROL        ${s.control}`,
+        `TRANSCENDENCE  ${s.transcendence}     PRAGMATISM     ${s.pragmatism}`
+    ];
+    metrics.forEach((m, i) => {
+        ctx.fillText(m, 44, y + 102 + i * 20);
+    });
+
+    // Footer
+    ctx.fillStyle = "#333";
+    ctx.font = "10.5px 'Space Mono', monospace";
+    ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + new Date().toISOString().slice(0,10), 44, canvas.height - 46);
+
+    modal.innerHTML = `
+        <div class="content">
+            <h3 style="color:#63d8ff; margin-bottom:12px;">Share Card Preview</h3>
+            <div id="canvasContainer"></div>
+            <div style="margin-top:16px;">
+                <button id="downloadBtn">Download PNG</button>
+                <button id="closeModalBtn">Close</button>
+            </div>
+        </div>
+    `;
+
+    modal.querySelector("#canvasContainer").appendChild(canvas);
+    document.body.appendChild(modal);
+
+    modal.querySelector("#downloadBtn").onclick = () => {
+        const link = document.createElement("a");
+        link.download = `voss_evaluation_${getPaddedNumber()}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        playBeep(1100, 80, 'sine', 0.03);
+    };
+
+    modal.querySelector("#closeModalBtn").onclick = () => {
+        modal.remove();
+    };
+
+    modal.onclick = (ev) => {
+        if (ev.target === modal) modal.remove();
+    };
+
+    playBeep(950, 90, 'sine', 0.025);
+}
+
+async function boot(){
+    resetState();
+    loadCandidateNumber();
+
+    const box=document.getElementById("log");
+
+    const savedData = loadState();
+
+    if (savedData) {
+        box.innerHTML = `
+            <pre style="color:#aaa; line-height:1.7;">Unfinished simulation detected.<br><br>
+Last progress: CASE ${savedData.event} / ${events.length}<br>
+Saved at: ${new Date(savedData.timestamp).toLocaleString()}<br><br>
+Continue from last session?</pre>
+            <br>
+            <button id="continueBtn">CONTINUE LAST SIMULATION</button>
+            <button id="newGameBtn">START NEW SIMULATION</button>
+        `;
+
+        document.getElementById("continueBtn").onclick = () => {
+            state = { ...savedData.state };
+            history_log = savedData.history_log || [];
+            finalIdeology = savedData.finalIdeology || "";
+            submitted = false;
+            pendingChoice = null;
+            pendingLabel = "";
+            selectedChoiceIndex = -1;
+            currentChoices = [];
+            playBeep(720, 60);
+            render();
+        };
+
+        document.getElementById("newGameBtn").onclick = () => {
+            clearSave();
+            incrementCandidateNumber();
+            boot();
+        };
+        return;
+    }
+
+    // Improved Login-style homepage
+    box.innerHTML = `
+        <div style="text-align:center; padding:20px 10px 10px;">
+            <div style="color:#63d8ff; letter-spacing:4px; font-size:13px; margin-bottom:8px;">VOXX INC.</div>
+            <h2 style="margin-bottom:6px;">VOSS PROTOCOL</h2>
+            <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:28px;">EXECUTIVE SELECTION SYSTEM</div>
+
+            <div style="margin: 24px 0 8px; padding: 16px 20px; border:1px solid #18232d; background:#090909; text-align:left; max-width:420px; margin-left:auto; margin-right:auto;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#888;">CANDIDATE</span>
+                    <span style="color:#e8e8e8; letter-spacing:2px;">#${getPaddedNumber()}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span style="color:#888;">STATUS</span>
+                    <span style="color:#6bffb8;">AWAITING EVALUATION</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#888;">AUTHORIZATION</span>
+                    <span style="color:#d4b35a;">PENDING</span>
+                </div>
+            </div>
+
+            <div style="margin-top:24px;">
+                <button id="beginBtn" style="max-width:420px; margin:0 auto;">BEGIN SIMULATION</button>
+            </div>
+
+            <div style="margin-top:18px; font-size:10px; color:#444; letter-spacing:1px;">
+                YOUR DECISIONS WILL DETERMINE THE FUTURE OF HUMANITY
+            </div>
+        </div>
+    `;
+
+    // Attach begin button listener - this one actually starts the simulation
+    setTimeout(() => {
+        const beginBtn = document.getElementById("beginBtn");
+        if (beginBtn) {
+            beginBtn.onclick = () => {
+                playBeep(850, 80);
+                incrementCandidateNumber();
+                clearSave();
+                resetState();
+                render();   // Directly start the first CASE
+            };
+        }
+    }, 50);
+}
+
+/* ===== MAIN EVENT LISTENERS ===== */
+document.getElementById("log").addEventListener("click", async e=>{
+    const bb=e.target.closest("#beginBtn");
+    if(bb){
+        // Only handle the very first BEGIN button (the one in initial HTML).
+        // The login screen button has its own direct onclick handler.
+        if (!document.querySelector('#log .option-label')) {
+            playBeep(850, 80);
+            incrementCandidateNumber();
+            boot();
+        }
+        return;
+    }
+
+    if(!testBlock.classList.contains("unlocked")) return;
+
+    const testA=e.target.closest("#testA");
+    if(testA){
+        resetState();
+        Object.assign(state,{stability:60,transcendence:30,pragmatism:50,control:40,compassion:50,trust:55,event:events.length});
+        finalIdeology="BALANCE";
+        clearSave();
+        render();
+        return;
+    }
+    const testB=e.target.closest("#testB");
+    if(testB){
+        resetState();
+        Object.assign(state,{stability:20,transcendence:5,pragmatism:10,control:10,compassion:80,event:events.length});
+        clearSave();
+        render();
+        return;
+    }
+    const testC=e.target.closest("#testC");
+    if(testC){
+        resetState();
+        Object.assign(state,{stability:80,transcendence:90,pragmatism:80,control:95,compassion:20,trust:70,event:events.length});
+        finalIdeology="PROTECTION";
+        clearSave();
+        render();
+        return;
+    }
+    const testP=e.target.closest("#testP");
+    if(testP){
+        resetState();
+        Object.assign(state,{stability:80,transcendence:70,pragmatism:80,control:55,compassion:80,trust:75,event:events.length});
+        finalIdeology="BALANCE";
+        clearSave();
+        render();
+        return;
+    }
+
+    const againBtn=e.target.closest("#again");
+    if(againBtn){
+        clearSave();
+        location.reload();
+        return;
+    }
+});
+
+/* RESTART confirmation */
+const resetBtn=document.getElementById("resetBtn");
+let resetConfirmTimer=null;
+function resetToDefault(){
+    resetBtn.classList.remove("confirm");
+    resetBtn.textContent="RESTART";
+    if(resetConfirmTimer){ clearTimeout(resetConfirmTimer); resetConfirmTimer=null; }
+}
+resetBtn.addEventListener("click",e=>{
+    e.stopPropagation();
+    if(!resetBtn.classList.contains("confirm")){
+        resetBtn.classList.add("confirm");
+        resetBtn.textContent="CONFIRM RESTART?";
+        resetConfirmTimer=setTimeout(resetToDefault,4000);
+        return;
+    }
+    resetToDefault();
+    clearSave();
+    location.reload();
+});
+resetBtn.addEventListener("mouseleave",()=>{ if(resetBtn.classList.contains("confirm")) resetToDefault(); });
+
+document.addEventListener("click",function(e){
+    if(e.target.closest("#resetBtn")) return;
+});
+
+document.addEventListener("click", () => {
+    if (!audioCtx) initAudio();
+}, { once: true });
+</script>
+</body>
+</html>
