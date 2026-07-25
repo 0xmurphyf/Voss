@@ -6,7 +6,7 @@
 <title>VOXX: VOSS PROTOCOL v2.6</title>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
-html, body { height:100%; }
+html, body { height:100%; overflow:hidden; }
 body {
     background:#020407; color:#f2f5f7;
     font-family:"Segoe UI",Arial,Helvetica,sans-serif;
@@ -17,11 +17,15 @@ body {
 #terminal {
     width: 96vw;
     max-width: 1400px;
+    height:calc(100dvh - 24px);
     background:#070b10;
     border:1px solid #18232d;
     padding: clamp(14px, 2.5vw, 32px) clamp(14px, 2vw, 32px);
     box-shadow:0 0 60px rgba(0,80,120,0.12);
     position:relative;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
     font-size: clamp(14px, 1.1vw, 16px);
     font-weight:500;
 }
@@ -90,7 +94,12 @@ button.choice-btn small {
 #submitBtn::before, #nextBtn::before { content:""; }
 #submitBtn:hover, #nextBtn:hover { background:#111; color:#fff; }
 #submitBtn:disabled { opacity:0.65; cursor:not-allowed; color:#aeb7c0; border-left-color:#596673; }
-#log { min-height: 260px; line-height:1.55; }
+#log {
+    flex:1 1 auto;
+    min-height:0;
+    line-height:1.55;
+    overflow:hidden;
+}
 #log [style*="color:#888"],
 #log [style*="color: #888"],
 #log [style*="color:#777"],
@@ -100,7 +109,7 @@ button.choice-btn small {
 #log [style*="color:#444"] {
     color:#aeb7c0 !important;
 }
-.reset-btn { margin-top:14px; padding:9px; background:#0a0f14; color:#c1c8cf; border:1px solid #34414d; cursor:pointer; font-family:inherit; letter-spacing:3px; font-size:0.82em; text-align:center; }
+.reset-btn { flex:0 0 auto; margin-top:10px; padding:9px; background:#0a0f14; color:#c1c8cf; border:1px solid #34414d; cursor:pointer; font-family:inherit; letter-spacing:3px; font-size:0.82em; text-align:center; }
 .reset-btn::before { content:""; }
 .reset-btn:hover { border-color:#8b3a3a; color:#8b3a3a; }
 .reset-btn.confirm { border-color:#8b3a3a; color:#8b3a3a; background:#111; }
@@ -186,9 +195,49 @@ input:focus-visible {
     outline-offset:2px;
 }
 
+/* Final evaluation is intentionally allowed to extend and scroll. */
+body.final-evaluation {
+    height:auto;
+    min-height:100dvh;
+    overflow-y:auto;
+}
+body.final-evaluation #terminal {
+    height:auto;
+    min-height:calc(100dvh - 24px);
+    overflow:visible;
+}
+body.final-evaluation #log {
+    overflow:visible;
+}
+
+@media (max-height: 900px) {
+    body { padding:6px 4px; }
+    #terminal {
+        height:calc(100dvh - 12px);
+        padding:12px 16px;
+        font-size:14px;
+    }
+    h2 { margin:2px 0 5px; font-size:16px; }
+    #typed { line-height:1.45; }
+    button { margin:3px 0; padding:7px 10px; }
+    button.choice-btn {
+        padding:7px 10px;
+        line-height:1.3;
+        font-size:13px;
+    }
+    button.choice-btn small { margin-top:1px; }
+    .stats, .fb, .voss-analysis, .timeline {
+        margin:6px 0;
+        padding:7px 10px;
+        line-height:1.5;
+    }
+    .psa { margin:6px 0; padding:7px 10px; }
+    .reset-btn { margin-top:6px; padding:7px; }
+}
+
 @media (max-width: 600px) {
-    body { padding: 8px 4px; }
-    #terminal { width: 100%; max-width: 100%; padding: 12px 10px; }
+    body { padding:4px; }
+    #terminal { width:100%; max-width:100%; height:calc(100dvh - 8px); padding:10px; }
     h1 { font-size: 20px; }
     h2 { font-size: 16px; }
     button, .choice-btn { font-size:14px; padding:11px 10px; }
@@ -393,7 +442,7 @@ function readoutColored(s, colorMap, markerMap){
     let h='<div class="stats">\n';
     ROWS.forEach(([k,label])=>{
         const col=colorMap[k]||"";
-        const color=col==='green'?'#6bffb8':col==='red'?'#8b3a3a':'#666';
+        const color=col==='green'?'#72ffc0':col==='red'?'#ff7474':'#e1e6ea';
         const bg=col==='green'?'rgba(107,255,184,0.06)':col==='red'?'rgba(139,58,58,0.06)':'transparent';
         const mk=markerMap[k]?markerMap[k]+" ":"  ";
         h+=`<span style="color:${color};background:${bg}">${L(label)}${meter(s[k])} ${mk}</span>\n`;
@@ -430,7 +479,7 @@ async function animateReadout(oldS, newS){
                 setTimeout(() => {
                     if (wrap.querySelectorAll) {
                         wrap.querySelectorAll('.stats span').forEach(sp => {
-                            sp.style.color = '#666';
+                            sp.style.color = '#e1e6ea';
                             sp.style.background = 'transparent';
                         });
                     }
@@ -690,9 +739,6 @@ function generateImplicitFeedback(changes){
     }
 
     if(blocks.length===0) blocks.push("Profile remains within acceptable operational range.");
-    let sim = 60 + (state.control*0.3) + (Math.random()*10);
-    blocks.push("");
-    blocks.push("Historical pattern similarity: "+sim.toFixed(1)+"%");
     return blocks.join("\n\n");
 }
 
@@ -832,6 +878,7 @@ async function typeHTML(el,html,speed=16){ const tokens=tokenize(html); let buil
 
 async function render(){
     const box=document.getElementById("log");
+    document.body.classList.toggle("final-evaluation", state.event>=events.length);
     if(state.event>=events.length){
         const out = evaluateCandidate();
         let animType = out.type==="NEW"?"P":out.type;
