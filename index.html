@@ -309,10 +309,10 @@ candidateEl.addEventListener("click", () => {
 
 /* ===== VIDEO ENDING ===== */
 const endingVideos = {
-    A: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny_320x180.mp4",
-    B: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    C: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny_320x180.mp4",
-    P: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny_320x180.mp4"
+    A: "assets/ending.mp4",
+    B: "assets/ending.mp4",
+    C: "assets/ending.mp4",
+    P: "assets/ending.mp4"
 };
 
 function showEndingSimulation(type, callback) {
@@ -324,6 +324,7 @@ function showEndingSimulation(type, callback) {
     video.autoplay = true;
     video.muted = true;
     video.playsInline = true;
+    video.preload = "auto";
     video.loop = false;
     video.style.width = "100%";
     video.style.height = "100%";
@@ -332,17 +333,22 @@ function showEndingSimulation(type, callback) {
     div.appendChild(video);
     document.body.appendChild(div);
 
-    video.onended = () => {
+    let completed = false;
+    const finish = () => {
+        if (completed) return;
+        completed = true;
         div.remove();
         callback();
     };
 
-    setTimeout(() => {
-        if (div.parentNode) {
-            div.remove();
-            callback();
-        }
-    }, 15000);
+    video.onended = finish;
+    video.onerror = finish;
+    video.oncanplay = () => {
+        video.play().catch(finish);
+    };
+
+    // Never trap the player behind a blank overlay if the CDN is unavailable.
+    setTimeout(finish, 12000);
 }
 
 function resetState(){
