@@ -1238,19 +1238,20 @@ Continue from last session?</pre>
         </div>
     `;
 
-    // Attach begin button listener - this one actually starts the simulation
-    setTimeout(() => {
-        const beginBtn = document.getElementById("beginBtn");
-        if (beginBtn) {
-            beginBtn.onclick = () => {
-                playBeep(850, 80);
-                incrementCandidateNumber();
-                clearSave();
-                resetState();
-                render();   // Directly start the first CASE
-            };
-        }
-    }, 50);
+    // Attach immediately so even a fast click cannot fall through to boot().
+    const beginBtn = document.getElementById("beginBtn");
+    if (beginBtn) {
+        beginBtn.onclick = (event) => {
+            // This button also sits inside the delegated click area below.
+            // Stop here so the same click cannot call boot() after render().
+            event.stopPropagation();
+            playBeep(850, 80);
+            incrementCandidateNumber();
+            clearSave();
+            resetState();
+            render();   // Directly start the first CASE
+        };
+    }
 }
 
 /* ===== MAIN EVENT LISTENERS ===== */
