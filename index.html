@@ -270,25 +270,27 @@ Failure is unacceptable.
 
 <script>
 /* ===== Global Candidate Counter ===== */
-let candidateNumber = 1500;
+let candidateNumber = null;
 
-function loadCandidateNumber() {
-    const saved = localStorage.getItem('voss_global_candidate_counter');
-    if (saved !== null) {
-        candidateNumber = parseInt(saved, 10);
-    } else {
-        candidateNumber = 1500;
-        localStorage.setItem('voss_global_candidate_counter', candidateNumber);
+async function allocateCandidateNumber() {
+    if (Number.isInteger(candidateNumber)) return candidateNumber;
+
+    const response = await fetch("/api/candidate/allocate", {
+        method: "POST",
+        headers: { "Accept": "application/json" }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !Number.isInteger(data.candidateNumber)) {
+        throw new Error(data.error || "Unable to allocate a global candidate number.");
     }
-}
-
-function incrementCandidateNumber() {
-    candidateNumber++;
-    localStorage.setItem('voss_global_candidate_counter', candidateNumber);
+    candidateNumber = data.candidateNumber;
+    return candidateNumber;
 }
 
 function getPaddedNumber() {
-    return String(candidateNumber).padStart(4, '0');
+    return Number.isInteger(candidateNumber)
+        ? String(candidateNumber).padStart(4, '0')
+        : "PENDING";
 }
 
 /* ===== AUDIO SYSTEM ===== */
@@ -329,6 +331,7 @@ function saveState() {
             state: { ...state },
             history_log: [...history_log],
             finalIdeology: finalIdeology,
+            candidateNumber: candidateNumber,
             event: state.event || 0,
             timestamp: Date.now()
         };
@@ -1233,7 +1236,7 @@ function createShareCardImage(outcome, epilogueText) {
 
 async function boot(){
     resetState();
-    loadCandidateNumber();
+    document.body.classList.remove("final-evaluation");
 
     const box=document.getElementById("log");
 
@@ -1250,7 +1253,19 @@ Continue from last session?</pre>
             <button id="newGameBtn">START NEW SIMULATION</button>
         `;
 
-        document.getElementById("continueBtn").onclick = () => {
+        document.getElementById("continueBtn").onclick = async () => {
+            const continueBtn = document.getElementById("continueBtn");
+            continueBtn.disabled = true;
+            continueBtn.textContent = "RESTORING CANDIDATE...";
+            try {
+                candidateNumber = Number.isInteger(savedData.candidateNumber)
+                    ? savedData.candidateNumber
+                    : await allocateCandidateNumber();
+            } catch {
+                continueBtn.disabled = false;
+                continueBtn.textContent = "GLOBAL COUNTER OFFLINE — RETRY";
+                return;
+            }
             state = { ...savedData.state };
             history_log = savedData.history_log || [];
             finalIdeology = savedData.finalIdeology || "";
@@ -1265,7 +1280,7 @@ Continue from last session?</pre>
 
         document.getElementById("newGameBtn").onclick = () => {
             clearSave();
-            incrementCandidateNumber();
+            candidateNumber = null;
             boot();
         };
         return;
@@ -1281,7 +1296,7 @@ Continue from last session?</pre>
             <div style="margin: 24px 0 8px; padding: 16px 20px; border:1px solid #18232d; background:#090909; text-align:left; max-width:420px; margin-left:auto; margin-right:auto;">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                     <span style="color:#888;">CANDIDATE</span>
-                    <span style="color:#e8e8e8; letter-spacing:2px;">#${getPaddedNumber()}</span>
+                    <span style="color:#e8e8e8; letter-spacing:2px;">#PENDING</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
                     <span style="color:#888;">STATUS</span>
@@ -1306,12 +1321,20 @@ Continue from last session?</pre>
     // Attach immediately so even a fast click cannot fall through to boot().
     const beginBtn = document.getElementById("beginBtn");
     if (beginBtn) {
-        beginBtn.onclick = (event) => {
+        beginBtn.onclick = async (event) => {
             // This button also sits inside the delegated click area below.
             // Stop here so the same click cannot call boot() after render().
             event.stopPropagation();
             playBeep(850, 80);
-            incrementCandidateNumber();
+            beginBtn.disabled = true;
+            beginBtn.textContent = "ALLOCATING GLOBAL CANDIDATE...";
+            try {
+                await allocateCandidateNumber();
+            } catch {
+                beginBtn.disabled = false;
+                beginBtn.textContent = "GLOBAL COUNTER OFFLINE — RETRY";
+                return;
+            }
             clearSave();
             resetState();
             render();   // Directly start the first CASE
@@ -1327,7 +1350,6 @@ document.getElementById("log").addEventListener("click", async e=>{
         // The login screen button has its own direct onclick handler.
         if (!document.querySelector('#log .option-label')) {
             playBeep(850, 80);
-            incrementCandidateNumber();
             boot();
         }
         return;

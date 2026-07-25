@@ -18,4 +18,12 @@ Connect this repository to a Railway service. Railway detects the Node.js
 application and runs `npm start`. The server listens on Railway's injected
 `PORT` environment variable and serves the game from the repository root.
 
-No build step or additional environment variables are required.
+Add a Railway PostgreSQL service to the same project, then set this application
+service's `DATABASE_URL` variable to:
+
+```text
+${{Postgres.DATABASE_URL}}
+```
+
+The server creates its counter table automatically. Candidate numbers are
+allocated atomically across all browsers and devices, beginning at `#1500`.

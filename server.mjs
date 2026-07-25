@@ -4,6 +4,28 @@ import { extname, join, normalize } from "node:path";
 
 const root = process.cwd();
 const port = Number.parseInt(process.env.PORT || "4173", 10);
+let developmentCounter = 1499;
+let pool = null;
+let counterReady = Promise.resolve();
+
+if (process.env.DATABASE_URL) {
+  const { Pool } = await import("pg");
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.PGSSLMODE === "disable"
+      ? false
+      : { rejectUnauthorized: false }
+  });
+  counterReady = pool.query(`
+    CREATE TABLE IF NOT EXISTS voss_counters (
+      name TEXT PRIMARY KEY,
+      value BIGINT NOT NULL
+    );
+    INSERT INTO voss_counters (name, value)
+    VALUES ('candidate', 1499)
+    ON CONFLICT (name) DO NOTHING;
+  `);
+}
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -15,8 +37,45 @@ const types = {
 };
 
 createServer(async (req, res) => {
+  let requestedPath = "";
   try {
     const raw = decodeURIComponent((req.url || "/").split("?")[0]);
+    requestedPath = raw;
+
+    if (raw === "/api/candidate/allocate" && req.method === "POST") {
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+
+      if (pool) {
+        await counterReady;
+        const result = await pool.query(`
+          UPDATE voss_counters
+          SET value = value + 1
+          WHERE name = 'candidate'
+          RETURNING value
+        `);
+        res.writeHead(200);
+        res.end(JSON.stringify({ candidateNumber: Number(result.rows[0].value) }));
+        return;
+      }
+
+      if (!process.env.RAILWAY_ENVIRONMENT) {
+        developmentCounter += 1;
+        res.writeHead(200);
+        res.end(JSON.stringify({
+          candidateNumber: developmentCounter,
+          developmentFallback: true
+        }));
+        return;
+      }
+
+      res.writeHead(503);
+      res.end(JSON.stringify({
+        error: "Global candidate counter requires DATABASE_URL"
+      }));
+      return;
+    }
+
     const relative = raw === "/" ? "index.html" : raw.replace(/^\/+/, "");
     const path = normalize(join(root, relative));
     if (!path.startsWith(root)) throw new Error("invalid path");
@@ -59,7 +118,16 @@ createServer(async (req, res) => {
         : "no-store"
     });
     res.end(body);
-  } catch {
+  } catch (error) {
+    if (requestedPath === "/api/candidate/allocate") {
+      console.error("Candidate allocation failed:", error);
+      res.writeHead(500, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      });
+      res.end(JSON.stringify({ error: "Global counter is temporarily unavailable" }));
+      return;
+    }
     res.writeHead(404);
     res.end("Not found");
   }
