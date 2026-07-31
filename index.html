@@ -712,7 +712,7 @@ choices:[
 title:"CASE 12<br><br>THE VOSS DECISION",
 classification: "FINAL PROTOCOL",
 text:()=>{
-    let base = "The truth is revealed.<br><br>The Xel'Nath signal was real.<br><br>The threat remains unknown.<br><br>VOXX used fear to control humanity.<br><br>Now you know everything.<br><br>What will you do?";
+    let base = "The truth is revealed.<br><br>The Xel'Nath signal was real.<br><br>The threat remains unknown.<br><br>VOXX used fear to control humanity.<br><br>Now you know everything.";
     if(checkHistory("PROTECT") || checkHistory("LIBERATE"))
         base += "<br><br><span class='dim'>[System Note: High public trust detected. They believe in you, despite the lies.]</span>";
     else
@@ -1404,6 +1404,13 @@ document.getElementById("log").addEventListener("click", async e=>{
         return;
     }
 
+    const againBtn=e.target.closest("#again");
+    if(againBtn){
+        clearSave();
+        location.reload();
+        return;
+    }
+
     if(!testBlock.classList.contains("unlocked")) return;
 
     const testA=e.target.closest("#testA");
@@ -1442,12 +1449,6 @@ document.getElementById("log").addEventListener("click", async e=>{
         return;
     }
 
-    const againBtn=e.target.closest("#again");
-    if(againBtn){
-        clearSave();
-        location.reload();
-        return;
-    }
 });
 
 /* RESTART confirmation */
