@@ -195,19 +195,56 @@ input:focus-visible {
     outline-offset:2px;
 }
 
-/* Final evaluation is intentionally allowed to extend and scroll. */
+/* Final evaluation scrolls inside the terminal while RESTART stays anchored. */
 body.final-evaluation {
-    height:auto;
-    min-height:100dvh;
-    overflow-y:auto;
+    height:100%;
+    min-height:0;
+    overflow:hidden;
 }
 body.final-evaluation #terminal {
-    height:auto;
-    min-height:calc(100dvh - 24px);
-    overflow:visible;
+    height:calc(100dvh - 24px);
+    min-height:0;
+    overflow:hidden;
 }
 body.final-evaluation #log {
-    overflow:visible;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    padding-right:8px;
+}
+
+.share-modal {
+    position:fixed;
+    inset:0;
+    z-index:10000;
+    display:grid;
+    place-items:center;
+    padding:16px;
+    background:rgba(0, 0, 0, 0.86);
+    backdrop-filter:blur(4px);
+}
+.share-modal .content {
+    width:min(520px, 100%);
+    max-height:calc(100dvh - 32px);
+    overflow:auto;
+    padding:24px;
+    background:#070b10;
+    border:1px solid #63d8ff;
+    box-shadow:0 20px 80px rgba(0,0,0,0.8);
+    text-align:center;
+}
+.share-modal.preview .content {
+    width:min(780px, 100%);
+}
+#canvasContainer {
+    width:100%;
+}
+#canvasContainer canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    margin:0 auto;
 }
 
 @media (max-height: 900px) {
@@ -241,6 +278,12 @@ body.final-evaluation #log {
     h1 { font-size: 20px; }
     h2 { font-size: 16px; }
     button, .choice-btn { font-size:14px; padding:11px 10px; }
+    body.final-evaluation #terminal { height:calc(100dvh - 8px); }
+    .share-modal { padding:10px; }
+    .share-modal .content {
+        max-height:calc(100dvh - 20px);
+        padding:18px 14px;
+    }
 }
 </style>
 </head>
@@ -1052,6 +1095,9 @@ let userRealName = "";
 function generateShareCard(outcome, epilogueText) {
     const modal = document.createElement("div");
     modal.className = "share-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Generate share card");
 
     modal.innerHTML = `
         <div class="content">
@@ -1097,7 +1143,10 @@ function generateShareCard(outcome, epilogueText) {
 
 function createShareCardImage(outcome, epilogueText) {
     const modal = document.createElement("div");
-    modal.className = "share-modal";
+    modal.className = "share-modal preview";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-label", "Share card preview");
 
     const canvas = document.createElement("canvas");
     canvas.width = 720;
