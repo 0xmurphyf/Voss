@@ -148,6 +148,24 @@ button.choice-btn small {
     object-fit: cover;
     opacity: 0.95;
 }
+.endingVideo .audio-enable-btn {
+    position:absolute;
+    left:50%;
+    bottom:max(28px, env(safe-area-inset-bottom));
+    z-index:2;
+    width:auto;
+    min-width:180px;
+    margin:0;
+    padding:11px 18px;
+    transform:translateX(-50%);
+    border:1px solid #63d8ff;
+    border-left:2px solid #63d8ff;
+    background:rgba(5, 10, 15, 0.9);
+    color:#fff;
+    text-align:center;
+    box-shadow:0 8px 28px rgba(0, 0, 0, 0.55);
+}
+.endingVideo .audio-enable-btn[hidden] { display:none; }
 
 .voss-analysis {
     border:1px solid #18232d;
@@ -422,10 +440,17 @@ candidateEl.addEventListener("click", () => {
 
 /* ===== VIDEO ENDING ===== */
 const endingVideos = {
-    A: "assets/ending.mp4",
-    B: "assets/ending.mp4",
-    C: "assets/ending.mp4",
-    P: "assets/ending.mp4"
+    A: "assets/endings/ending-a.mp4",
+    B: "assets/endings/ending-b.mp4",
+    C: "assets/endings/ending-c.mp4",
+    P: "assets/endings/ending-perfect.mp4"
+};
+
+const endingPosters = {
+    A: "assets/endings/ending-a.png",
+    B: "assets/endings/ending-b.png",
+    C: "assets/endings/ending-c.png",
+    P: "assets/endings/ending-perfect.png"
 };
 
 function showEndingSimulation(type, callback) {
@@ -434,8 +459,10 @@ function showEndingSimulation(type, callback) {
 
     const video = document.createElement("video");
     video.src = endingVideos[type] || endingVideos.A;
+    video.poster = endingPosters[type] || endingPosters.A;
     video.autoplay = true;
-    video.muted = true;
+    video.muted = false;
+    video.volume = 0.7;
     video.playsInline = true;
     video.preload = "auto";
     video.loop = false;
@@ -443,25 +470,65 @@ function showEndingSimulation(type, callback) {
     video.style.height = "100%";
     video.style.objectFit = "cover";
 
-    div.appendChild(video);
+    const audioButton = document.createElement("button");
+    audioButton.className = "audio-enable-btn";
+    audioButton.type = "button";
+    audioButton.textContent = "ENABLE AUDIO / 开启声音";
+    audioButton.hidden = true;
+
+    div.append(video, audioButton);
     document.body.appendChild(div);
 
     let completed = false;
+    let safetyTimer;
     const finish = () => {
         if (completed) return;
         completed = true;
+        clearTimeout(safetyTimer);
         div.remove();
         callback();
     };
 
+    const startPlayback = async () => {
+        try {
+            video.muted = false;
+            await video.play();
+            audioButton.hidden = true;
+        } catch (_) {
+            // Browsers may reject unmuted autoplay. Keep the ending visible and
+            // let the next explicit user gesture restore its soundtrack.
+            video.muted = true;
+            audioButton.hidden = false;
+            try {
+                await video.play();
+            } catch (_) {
+                finish();
+            }
+        }
+    };
+
+    audioButton.addEventListener("click", async event => {
+        event.stopPropagation();
+        try {
+            video.muted = false;
+            await video.play();
+            audioButton.hidden = true;
+        } catch (_) {
+            video.muted = true;
+            audioButton.hidden = false;
+        }
+    });
+
     video.onended = finish;
     video.onerror = finish;
     video.oncanplay = () => {
-        video.play().catch(finish);
+        if (video.paused) startPlayback();
     };
 
+    startPlayback();
+
     // Never trap the player behind a blank overlay if the CDN is unavailable.
-    setTimeout(finish, 12000);
+    safetyTimer = setTimeout(finish, 12000);
 }
 
 function resetState(){
