@@ -236,15 +236,15 @@ body.final-evaluation::before {
     z-index:1;
     pointer-events:none;
     background:
-        linear-gradient(90deg, rgba(2,4,7,0.84), rgba(2,4,7,0.48) 50%, rgba(2,4,7,0.78)),
-        linear-gradient(0deg, rgba(2,4,7,0.72), rgba(2,4,7,0.18) 55%, rgba(2,4,7,0.6));
+        linear-gradient(90deg, rgba(2,4,7,0.66), rgba(2,4,7,0.28) 50%, rgba(2,4,7,0.56)),
+        linear-gradient(0deg, rgba(2,4,7,0.54), rgba(2,4,7,0.1) 55%, rgba(2,4,7,0.42));
 }
 body.final-evaluation #terminal {
     z-index:2;
     height:calc(100dvh - 24px);
     min-height:0;
     overflow:hidden;
-    background:rgba(7,11,16,0.78);
+    background:rgba(7,11,16,0.58);
     border-color:rgba(99,216,255,0.3);
     box-shadow:0 18px 90px rgba(0,0,0,0.62);
     backdrop-filter:blur(3px);
@@ -510,7 +510,6 @@ function showEndingSimulation(type, callback) {
 
     const video = document.createElement("video");
     video.src = endingVideos[type] || endingVideos.A;
-    video.poster = endingPosters[type] || endingPosters.A;
     // Call play() ourselves while the final user gesture is still active.
     // This is more reliable than the autoplay attribute for audible media.
     video.autoplay = false;
