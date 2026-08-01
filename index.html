@@ -13,6 +13,7 @@ body {
     display:flex; justify-content:center; align-items:flex-start;
     min-height:100vh; min-height:100dvh;
     padding: 12px 8px;
+    isolation:isolate;
 }
 #terminal {
     width: 96vw;
@@ -214,15 +215,39 @@ input:focus-visible {
 }
 
 /* Final evaluation scrolls inside the terminal while RESTART stays anchored. */
+#finalEvaluationBackground {
+    position:fixed;
+    inset:0;
+    z-index:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    pointer-events:none;
+}
 body.final-evaluation {
     height:100%;
     min-height:0;
     overflow:hidden;
 }
+body.final-evaluation::before {
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:1;
+    pointer-events:none;
+    background:
+        linear-gradient(90deg, rgba(2,4,7,0.84), rgba(2,4,7,0.48) 50%, rgba(2,4,7,0.78)),
+        linear-gradient(0deg, rgba(2,4,7,0.72), rgba(2,4,7,0.18) 55%, rgba(2,4,7,0.6));
+}
 body.final-evaluation #terminal {
+    z-index:2;
     height:calc(100dvh - 24px);
     min-height:0;
     overflow:hidden;
+    background:rgba(7,11,16,0.78);
+    border-color:rgba(99,216,255,0.3);
+    box-shadow:0 18px 90px rgba(0,0,0,0.62);
+    backdrop-filter:blur(3px);
 }
 body.final-evaluation #log {
     overflow-x:hidden;
@@ -452,6 +477,32 @@ const endingPosters = {
     C: "assets/endings/ending-c.png",
     P: "assets/endings/ending-perfect.png"
 };
+
+function getEndingAssetType(outcomeOrType) {
+    const type = typeof outcomeOrType === "string" ? outcomeOrType : outcomeOrType?.type;
+    return type === "NEW" ? "P" : (endingVideos[type] ? type : "A");
+}
+
+function clearFinalEvaluationBackground() {
+    document.getElementById("finalEvaluationBackground")?.remove();
+}
+
+function setFinalEvaluationBackground(outcomeOrType) {
+    clearFinalEvaluationBackground();
+    const type = getEndingAssetType(outcomeOrType);
+    const video = document.createElement("video");
+    video.id = "finalEvaluationBackground";
+    video.src = endingVideos[type];
+    video.poster = endingPosters[type];
+    video.autoplay = true;
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.setAttribute("aria-hidden", "true");
+    document.body.prepend(video);
+    video.play().catch(() => {});
+}
 
 function showEndingSimulation(type, callback) {
     const div = document.createElement("div");
@@ -994,6 +1045,7 @@ async function render(){
         const out = evaluateCandidate();
         let animType = out.type==="NEW"?"P":out.type;
         showEndingSimulation(animType, async () => {
+            setFinalEvaluationBackground(out);
             const ev = buildEvaluationScreen();
             box.innerHTML = `<pre id="evalText" class="feedbackFadeIn eval-pre"></pre>`;
             await typeHTML(document.getElementById("evalText"), `<span class="${out.color}">${ev.screen}</span>`, 8);
@@ -1206,7 +1258,23 @@ function generateShareCard(outcome, epilogueText) {
     };
 }
 
-function createShareCardImage(outcome, epilogueText) {
+function loadCanvasImage(src) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = src;
+    });
+}
+
+function drawImageCover(ctx, image, width, height) {
+    const scale = Math.max(width / image.width, height / image.height);
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
+async function createShareCardImage(outcome, epilogueText) {
     const modal = document.createElement("div");
     modal.className = "share-modal preview";
     modal.setAttribute("role", "dialog");
@@ -1218,8 +1286,20 @@ function createShareCardImage(outcome, epilogueText) {
     canvas.height = 620;
     const ctx = canvas.getContext("2d");
 
-    // Background
+    // Ending-specific artwork background with a strong readability veil.
     ctx.fillStyle = "#04070b";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const endingType = getEndingAssetType(outcome);
+    try {
+        const backgroundImage = await loadCanvasImage(endingPosters[endingType]);
+        drawImageCover(ctx, backgroundImage, canvas.width, canvas.height);
+    } catch (_) {}
+
+    const backgroundVeil = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    backgroundVeil.addColorStop(0, "rgba(2, 4, 7, 0.9)");
+    backgroundVeil.addColorStop(0.58, "rgba(2, 4, 7, 0.7)");
+    backgroundVeil.addColorStop(1, "rgba(2, 4, 7, 0.84)");
+    ctx.fillStyle = backgroundVeil;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Border
@@ -1271,7 +1351,7 @@ function createShareCardImage(outcome, epilogueText) {
     });
 
     // Epilogue
-    ctx.fillStyle = "#777";
+    ctx.fillStyle = "#c6cbd1";
     ctx.font = "13.5px 'Space Mono', monospace";
     const epiLines = epilogueText.split(". ");
     y += 6;
@@ -1311,7 +1391,7 @@ function createShareCardImage(outcome, epilogueText) {
     });
 
     // Footer
-    ctx.fillStyle = "#333";
+    ctx.fillStyle = "#81909e";
     ctx.font = "10.5px 'Space Mono', monospace";
     ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + new Date().toISOString().slice(0,10), 44, canvas.height - 46);
 
@@ -1351,6 +1431,7 @@ function createShareCardImage(outcome, epilogueText) {
 async function boot(){
     resetState();
     document.body.classList.remove("final-evaluation");
+    clearFinalEvaluationBackground();
 
     const box=document.getElementById("log");
 
