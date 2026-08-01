@@ -460,9 +460,11 @@ function showEndingSimulation(type, callback) {
     const video = document.createElement("video");
     video.src = endingVideos[type] || endingVideos.A;
     video.poster = endingPosters[type] || endingPosters.A;
-    video.autoplay = true;
+    // Call play() ourselves while the final user gesture is still active.
+    // This is more reliable than the autoplay attribute for audible media.
+    video.autoplay = false;
     video.muted = false;
-    video.volume = 0.7;
+    video.volume = 0.9;
     video.playsInline = true;
     video.preload = "auto";
     video.loop = false;
@@ -521,10 +523,6 @@ function showEndingSimulation(type, callback) {
 
     video.onended = finish;
     video.onerror = finish;
-    video.oncanplay = () => {
-        if (video.paused) startPlayback();
-    };
-
     startPlayback();
 
     // Never trap the player behind a blank overlay if the CDN is unavailable.
