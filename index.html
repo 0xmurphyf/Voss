@@ -91,7 +91,7 @@ button.choice-btn small {
     margin-bottom: 3px;
     display: block;
 }
-#submitBtn, #nextBtn { text-align:center; border-left:2px solid #63d8ff; color:#63d8ff; margin-top:10px; letter-spacing:2px; }
+#submitBtn, #nextBtn { text-align:center; border-left:2px solid #63d8ff; color:#63d8ff; margin-top:10px; letter-spacing:2px; position:sticky; bottom:0; z-index:5; background:#070b10; box-shadow:0 -8px 16px #070b10; }
 #submitBtn::before, #nextBtn::before { content:""; }
 #submitBtn:hover, #nextBtn:hover { background:#111; color:#fff; }
 #submitBtn:disabled { opacity:0.65; cursor:not-allowed; color:#aeb7c0; border-left-color:#596673; }
@@ -99,7 +99,8 @@ button.choice-btn small {
     flex:1 1 auto;
     min-height:0;
     line-height:1.55;
-    overflow:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
 }
 #telemetry {
     display:none;
@@ -1261,7 +1262,7 @@ function bindChoiceListeners() {
             await animateReadout(old, newS);
             await sleep(1200);
 
-            document.getElementById("roWrap").innerHTML += `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
+            box.innerHTML += `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
 
             const nextBtn = document.getElementById("nextBtn");
             if (nextBtn) {
