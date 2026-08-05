@@ -76,13 +76,29 @@ button:hover { background:#111; border-color:#63d8ff; border-left-color:#63d8ff;
 button small { color:#c1c8cf; font-size:0.82em; display:block; margin-top:3px; pointer-events:none; }
 button.choice-btn.selected { border-color:#63d8ff; border-left-color:#63d8ff; background:#111; color:#e8e8e8; }
 button.choice-btn {
+    --risk: #63d8ff;
+    position: relative;
     font-size: clamp(13px, 1.0vw, 15px);
-    padding: 10px 12px;
+    padding: 10px 12px 10px 18px;
     line-height: 1.45;
+    border-left: 3px solid var(--risk);
+    background: #0a0f14;
+    transition: background 0.15s ease, border-left-color 0.15s ease;
 }
+button.choice-btn.risk-high { --risk: #ff7474; }
+button.choice-btn.risk-mid  { --risk: #f3cf69; }
+button.choice-btn.risk-low  { --risk: #72ffc0; }
+button.choice-btn.risk-control { --risk: #63d8ff; }
 button.choice-btn small {
     font-size: 0.8em;
-    margin-top: 2px;
+    margin-top: 4px;
+    color: #aeb7c0;
+    display: block;
+    letter-spacing: 0.3px;
+}
+button.choice-btn small .delta {
+    color: var(--risk);
+    font-variant-numeric: tabular-nums;
 }
 .option-label {
     color: #63d8ff;
@@ -119,12 +135,18 @@ body.case-active #log { margin-right:305px; }
 .telemetry-head {
     display:flex;
     justify-content:space-between;
+    align-items:center;
     padding:11px 12px;
     border-bottom:1px solid #244351;
     color:#b9cad1;
     font-size:11px;
     letter-spacing:1.3px;
+    cursor:pointer;
+    user-select:none;
 }
+.telemetry-toggle { color:#63d8ff; font-size:14px; line-height:1; }
+body.telemetry-collapsed #telemetry .telemetry-body { display:none; }
+body.telemetry-collapsed #telemetry { bottom:58px; }
 .telemetry-live { color:#78f2b2; }
 .telemetry-body { padding:0 12px; overflow:auto; }
 .telemetry-label { margin:16px 0 8px; color:#71ddfa; font-size:10px; letter-spacing:1.6px; }
@@ -132,6 +154,7 @@ body.case-active #log { margin-right:305px; }
 .telemetry-case { color:#b9cad1; font-size:11px; line-height:1.5; }
 .telemetry-metric { margin:10px 0; }
 .telemetry-metric-head { display:flex; justify-content:space-between; color:#cfdee4; font-size:11px; margin-bottom:5px; }
+.telemetry-metric-head span:last-child { font-weight:700; font-size:13px; color:#fff; font-variant-numeric:tabular-nums; }
 .telemetry-rail { height:5px; background:#1a2b33; overflow:hidden; }
 .telemetry-fill { height:100%; background:#6cdefa; transition:width .25s ease,background .25s ease; }
 .telemetry-trail { display:flex; flex-wrap:wrap; gap:5px; }
@@ -183,8 +206,29 @@ body.case-active #log { margin-right:305px; }
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.95;
+    opacity: 0.32;
 }
+.endingVideo .analysis-card {
+    position:absolute;
+    right:max(16px, 4vw);
+    top:50%;
+    transform:translateY(-50%);
+    width:min(360px, 86vw);
+    max-height:82vh;
+    overflow:auto;
+    background:rgba(7,11,16,0.86);
+    border:1px solid #63d8ff;
+    border-radius:10px;
+    padding:18px 20px;
+    z-index:3;
+    box-shadow:0 18px 60px rgba(0,0,0,0.7);
+    backdrop-filter:blur(4px);
+}
+.endingVideo .analysis-card .voss-analysis { border-left-color:#d4b35a; background:transparent; padding:0; margin:0 0 10px; }
+.endingVideo .analysis-card .eval-pre,
+.endingVideo .analysis-card .timeline { margin:8px 0; }
+.endingVideo .analysis-card #shareBtn,
+.endingVideo .analysis-card #again { width:100%; margin-top:8px; }
 .endingVideo .audio-enable-btn {
     position:absolute;
     left:50%;
@@ -356,7 +400,8 @@ body.final-evaluation #log {
     #terminal { width:100%; max-width:100%; height:calc(100dvh - 8px); padding:10px; }
     h1 { font-size: 20px; }
     h2 { font-size: 16px; }
-    button, .choice-btn { font-size:14px; padding:11px 10px; }
+    button, .choice-btn { font-size:14px; padding:13px 10px; min-height:46px; }
+    button.choice-btn { padding:13px 10px 13px 18px; min-height:46px; line-height:1.35; }
     body.final-evaluation #terminal { height:calc(100dvh - 8px); }
     .share-modal { padding:10px; }
     .share-modal .content {
@@ -365,8 +410,22 @@ body.final-evaluation #log {
     }
 }
 @media (max-width: 980px) {
-    #telemetry { display:none !important; }
+    #telemetry {
+        display:flex;
+        flex-direction:column;
+        position:fixed;
+        left:8px; right:8px; bottom:8px;
+        top:auto;
+        width:auto;
+        max-height:42vh;
+        z-index:50;
+        border-radius:8px;
+        box-shadow:0 -10px 40px rgba(0,0,0,0.6);
+    }
     body.case-active #log { margin-right:0; }
+    .telemetry-head::after { content:"▴"; }
+    body.telemetry-collapsed #telemetry { max-height:44px; overflow:hidden; }
+    body.telemetry-collapsed .telemetry-head::after { content:"▾"; }
 }
 </style>
 </head>
@@ -392,7 +451,7 @@ Failure is unacceptable.
 <div class="test-unlock-hint" id="testHint"></div>
 </div>
 <aside id="telemetry" aria-label="VOSS telemetry">
-    <div class="telemetry-head"><span>VOSS TELEMETRY</span><span class="telemetry-live">● LIVE</span></div>
+    <div class="telemetry-head" id="telemetryHead"><span>VOSS TELEMETRY</span><span class="telemetry-live">● LIVE <span class="telemetry-toggle">▾</span></span></div>
     <div class="telemetry-body">
         <div class="telemetry-label">CURRENT CASE</div>
         <div class="telemetry-case" id="telemetryCase">AWAITING SIMULATION</div>
@@ -1204,8 +1263,23 @@ async function render(){
 
     e.choices.forEach((c, idx) => {
         const plain=c[0].replace(/<[^>]+>/g,' ').trim();
-        bh+=`<button class="choice-btn" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
+        const ch=c[1]||{};
+        // 风险等级: 控制/稳定大幅变动 = high; 中等 = mid; 轻微 = low
+        const mag = Math.max(
+            Math.abs(ch.control||0), Math.abs(ch.stability||0),
+            Math.abs(ch.compassion||0), Math.abs(ch.freedom||0)
+        );
+        const riskCls = mag>=15 ? 'risk-high' : mag>=8 ? 'risk-mid' : 'risk-low';
+        // 后果预览: 取前两个最显著的维度变动
+        const deltas = Object.entries(ch)
+            .filter(([k,v])=>typeof v==='number' && v!==0 && !['finalIdeology'].includes(k))
+            .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
+            .slice(0,2)
+            .map(([k,v])=>`${k[0].toUpperCase()+k.slice(1)} ${v>0?'+':''}${v}`)
+            .join('  ');
+        bh+=`<button class="choice-btn ${riskCls}" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
             <span style="color:#63d8ff; margin-right:8px;">> OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
+            ${deltas?`<small>后果预览: <span class="delta">${deltas}</span></small>`:''}
         </button>`;
     });
     bh+=`<button id="submitBtn" disabled>SUBMIT DECISION</button>`;
@@ -1544,6 +1618,10 @@ async function createShareCardImage(outcome, epilogueText) {
 }
 
 async function boot(){
+    // 遥测面板折叠交互(desktop 侧栏 / mobile 抽屉通用)
+    const th = document.getElementById("telemetryHead");
+    if (th) th.addEventListener("click", () => document.body.classList.toggle("telemetry-collapsed"));
+
     resetState();
     document.body.classList.remove("final-evaluation");
     clearFinalEvaluationBackground();
