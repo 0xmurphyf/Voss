@@ -1608,7 +1608,7 @@ function generateShareCard(outcome, epilogueText) {
             <h3 style="color:#63d8ff; margin-bottom:14px;">Generate Share Card</h3>
 
             <div style="margin-bottom:18px; text-align:left;">
-                <div style="color:#888; font-size:13px; margin-bottom:6px;">Do you still remember your real name?</div>
+                <div style="color:#888; font-size:13px; margin-bottom:6px;">NAME (OPTIONAL)</div>
                 <input id="nameInput" type="text" placeholder="Enter your name (optional)"
                        style="width:100%; padding:9px 11px; background:#0c0c0c; border:1px solid #1c1c1c; color:#e8e8e8; font-family:inherit; font-size:14px;">
             </div>
@@ -1784,21 +1784,16 @@ async function createShareCardImage(outcome, epilogueText) {
         }
     });
 
-    // Polished question
-    ctx.fillStyle = "#8a929b";
-    ctx.font = "italic 14.5px 'Space Mono', monospace";
-    ctx.fillText("Do you still remember your real name?", 44, y + 30);
-
     // Key Metrics section
     ctx.strokeStyle = "#18232d";
     ctx.beginPath();
-    ctx.moveTo(44, y + 52);
-    ctx.lineTo(canvas.width - 44, y + 52);
+    ctx.moveTo(44, y + 22);
+    ctx.lineTo(canvas.width - 44, y + 22);
     ctx.stroke();
 
     ctx.fillStyle = "#63d8ff";
     ctx.font = "bold 13px 'Space Mono', monospace";
-    ctx.fillText("KEY METRICS", 44, y + 78);
+    ctx.fillText("KEY METRICS", 44, y + 48);
 
     ctx.fillStyle = "#8a929b";
     ctx.font = "12.5px 'Space Mono', monospace";
@@ -1809,7 +1804,7 @@ async function createShareCardImage(outcome, epilogueText) {
         `TRANSCENDENCE  ${s.transcendence}     PRAGMATISM     ${s.pragmatism}`
     ];
     metrics.forEach((m, i) => {
-        ctx.fillText(m, 44, y + 102 + i * 20);
+        ctx.fillText(m, 44, y + 72 + i * 20);
     });
 
     // Footer
