@@ -101,7 +101,7 @@ button.choice-btn::before { content:""; }
 .choice-index {
     display:block;
     margin-bottom:4px;
-    color:#8e99a3;
+    color:#8fdcf5;
     font-size:0.76em;
     font-weight:600;
     letter-spacing:0.16em;
@@ -1417,7 +1417,7 @@ async function render(){
     e.choices.forEach((c, idx) => {
         const plain=c[0].replace(/<[^>]+>/g,' ').trim();
         bh+=`<button class="choice-btn" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
-            <span class="choice-index">OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
+            <span class="choice-index">&gt; OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
         </button>`;
     });
     document.getElementById("choiceList").innerHTML=bh;
