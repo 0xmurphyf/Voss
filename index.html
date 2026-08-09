@@ -344,6 +344,10 @@ button.choice-btn small {
     font-size:13.5px;
 }
 #groupedParams, #endText { text-align:left; }
+#endText .final-sentence {
+    display:block;
+    margin:0 0 6px;
+}
 .param-row span:first-child { color:#cbd2d8; }
 .param-row span:last-child { color:#fff; font-weight:700; letter-spacing:1px; }
 
@@ -431,6 +435,7 @@ body.final-evaluation #log {
     height:auto;
     margin:0 auto;
 }
+#nameInput::placeholder { color:#63d8ff; opacity:0.62; }
 
 @media (max-height: 900px) {
     body { padding:6px 4px; }
@@ -1391,9 +1396,16 @@ async function render(){
 
             box.innerHTML += `<div id="endText"></div><div class="timeline ${out.color}" id="tl"></div>`;
             const epi = epilogue(getLastTag(), out.type);
-            const compactCore = out.core.replace(/(?:<br>){2,}/g,"<br>");
+            const compactCore = out.core.split(/<br>/i)
+                .map(line => line.trim())
+                .filter(Boolean)
+                .map(line => `<span class="final-sentence">${line}</span>`)
+                .join("");
+            const compactEpilogue = (epi.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [epi])
+                .map(line => `<span class="final-sentence">${escapeHTML(line.trim())}</span>`)
+                .join("");
             await typeHTML(document.getElementById("endText"),
-                `<span class="${out.color}">${out.name}</span><br>${compactCore}<br><span style="color:#777">${epi}</span>`);
+                `<span class="${out.color} final-sentence">${out.name}</span>${compactCore}<span style="color:#777">${compactEpilogue}</span>`);
             document.getElementById("tl").textContent = buildTimeline();
 
             const installFinalActions = () => {
@@ -1618,7 +1630,7 @@ function generateShareCard(outcome, epilogueText) {
             <div style="margin-bottom:18px; text-align:left;">
                 <div style="color:#63d8ff; font-size:13px; margin-bottom:6px;">Do you still remember your real name?</div>
                 <input id="nameInput" type="text" placeholder="Enter your name (optional)"
-                       style="width:100%; padding:9px 11px; background:#0c0c0c; border:1px solid #1c1c1c; color:#e8e8e8; font-family:inherit; font-size:14px;">
+                       style="width:100%; padding:9px 11px; background:#0c0c0c; border:1px solid #63d8ff; color:#63d8ff; caret-color:#63d8ff; font-family:inherit; font-size:14px;">
             </div>
 
             <div style="margin-top:8px;">
@@ -1691,7 +1703,7 @@ async function createShareCardImage(outcome, epilogueText) {
 
     const canvas = document.createElement("canvas");
     canvas.width = 720;
-    canvas.height = 700;
+    canvas.height = 660;
     const ctx = canvas.getContext("2d");
 
     // Ending-specific artwork background with a strong readability veil.
@@ -1776,7 +1788,7 @@ async function createShareCardImage(outcome, epilogueText) {
     coreLines.forEach(line => {
         if (line.trim()) {
             ctx.fillText(line.trim(), 44, y, 450);
-            y += 34;
+            y += 29;
         }
     });
 
@@ -1788,7 +1800,7 @@ async function createShareCardImage(outcome, epilogueText) {
     epiLines.forEach((line, i) => {
         if (i < 3 && line.trim()) {
             ctx.fillText(line.trim() + (i < epiLines.length-1 ? "." : ""), 44, y);
-            y += 32;
+            y += 27;
         }
     });
 
@@ -1827,6 +1839,7 @@ async function createShareCardImage(outcome, epilogueText) {
             <h3 style="color:#63d8ff; margin-bottom:12px;">Share Card Preview</h3>
             <div id="canvasContainer"></div>
             <div style="margin-top:16px;">
+                <button id="shareXBtn">SHARE ON X</button>
                 <button id="downloadBtn">Download PNG</button>
                 <button id="closeModalBtn">Close</button>
             </div>
@@ -1835,6 +1848,12 @@ async function createShareCardImage(outcome, epilogueText) {
 
     modal.querySelector("#canvasContainer").appendChild(canvas);
     document.body.appendChild(modal);
+
+    modal.querySelector("#shareXBtn").onclick = () => {
+        const shareText = "I passed the test";
+        window.open(`https://x.com/intent/post?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
+        playBeep(1050, 70, 'sine', 0.025);
+    };
 
     modal.querySelector("#downloadBtn").onclick = () => {
         const link = document.createElement("a");
