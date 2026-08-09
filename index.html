@@ -1608,7 +1608,7 @@ function generateShareCard(outcome, epilogueText) {
             <h3 style="color:#63d8ff; margin-bottom:14px;">Generate Share Card</h3>
 
             <div style="margin-bottom:18px; text-align:left;">
-                <div style="color:#888; font-size:13px; margin-bottom:6px;">NAME (OPTIONAL)</div>
+                <div style="color:#888; font-size:13px; margin-bottom:6px;">Do you still remember your real name?</div>
                 <input id="nameInput" type="text" placeholder="Enter your name (optional)"
                        style="width:100%; padding:9px 11px; background:#0c0c0c; border:1px solid #1c1c1c; color:#e8e8e8; font-family:inherit; font-size:14px;">
             </div>
@@ -1810,7 +1810,8 @@ async function createShareCardImage(outcome, epilogueText) {
     // Footer
     ctx.fillStyle = "#81909e";
     ctx.font = "10.5px 'Space Mono', monospace";
-    ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + new Date().toISOString().slice(0,10), 44, canvas.height - 46);
+    const generatedAt = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
+    ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + generatedAt, 44, canvas.height - 46);
 
     modal.innerHTML = `
         <div class="content">
