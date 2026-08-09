@@ -107,7 +107,7 @@ button.choice-btn small .delta {
     margin-bottom: 3px;
     display: block;
 }
-#submitBtn, #nextBtn { text-align:center; border-left:2px solid #63d8ff; color:#63d8ff; margin-top:10px; letter-spacing:2px; position:sticky; bottom:0; z-index:5; background:#070b10; box-shadow:0 -8px 16px #070b10; }
+#submitBtn, #nextBtn { text-align:center; border-left:2px solid #63d8ff; color:#63d8ff; margin:0; letter-spacing:2px; background:#070b10; }
 #submitBtn::before, #nextBtn::before { content:""; }
 #submitBtn:hover, #nextBtn:hover { background:#111; color:#fff; }
 #submitBtn:disabled { opacity:0.65; cursor:not-allowed; color:#aeb7c0; border-left-color:#596673; }
@@ -117,6 +117,30 @@ button.choice-btn small .delta {
     line-height:1.55;
     overflow-y:auto;
     overscroll-behavior:contain;
+}
+.decision-screen {
+    height:100%;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+}
+.decision-content {
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    padding-right:4px;
+    padding-bottom:10px;
+}
+.decision-actions {
+    flex:0 0 auto;
+    min-height:52px;
+    padding-top:8px;
+    background:#070b10;
+    border-top:1px solid #18232d;
+    box-shadow:0 -10px 18px #070b10;
+    position:relative;
+    z-index:5;
 }
 #telemetry {
     display:none;
@@ -393,6 +417,7 @@ body.final-evaluation #log {
     }
     .psa { margin:6px 0; padding:7px 10px; }
     .reset-btn { margin-top:6px; padding:7px; }
+    .decision-actions { min-height:44px; padding-top:6px; }
 }
 
 @media (max-width: 600px) {
@@ -402,6 +427,7 @@ body.final-evaluation #log {
     h2 { font-size: 16px; }
     button, .choice-btn { font-size:14px; padding:13px 10px; min-height:46px; }
     button.choice-btn { padding:13px 10px 13px 18px; min-height:46px; line-height:1.35; }
+    .decision-actions { min-height:60px; padding-top:7px; }
     body.final-evaluation #terminal { height:calc(100dvh - 8px); }
     .share-modal { padding:10px; }
     .share-modal .content {
@@ -1254,7 +1280,15 @@ async function render(){
     const classHTML = e.classification ?
         `<div class="dim" style="margin-bottom:8px; letter-spacing:1.5px;">CLASS: ${e.classification}</div>` : '';
 
-    box.innerHTML=`<h2>${e.title}</h2>${classHTML}<div id="typed"></div>`;
+    box.innerHTML=`<div class="decision-screen">
+        <div class="decision-content" id="decisionContent">
+            <h2>${e.title}</h2>${classHTML}<div id="typed"></div>
+            <div id="choiceList"></div>
+        </div>
+        <div class="decision-actions" id="decisionActions">
+            <button id="submitBtn" disabled>SUBMIT DECISION</button>
+        </div>
+    </div>`;
     await typeHTML(document.getElementById("typed"), textContent+"<br><br><i>"+e.question+"</i>");
 
     let bh="";
@@ -1282,8 +1316,7 @@ async function render(){
             ${deltas?`<small>后果预览: <span class="delta">${deltas}</span></small>`:''}
         </button>`;
     });
-    bh+=`<button id="submitBtn" disabled>SUBMIT DECISION</button>`;
-    box.innerHTML+=bh;
+    document.getElementById("choiceList").innerHTML=bh;
 
     bindChoiceListeners();
 }
@@ -1324,10 +1357,15 @@ function bindChoiceListeners() {
             const vossAnalysis = generateVossAnalysis(pendingChoice);
 
             box.innerHTML = `
-                <div class="psa">DECISION RECORDED</div>
-                <div class="fb" id="fb"></div>
-                <div class="voss-analysis"><pre>${vossAnalysis}</pre></div>
-                <div id="roWrap"></div>
+                <div class="decision-screen">
+                    <div class="decision-content" id="decisionContent">
+                        <div class="psa">DECISION RECORDED</div>
+                        <div class="fb" id="fb"></div>
+                        <div class="voss-analysis"><pre>${vossAnalysis}</pre></div>
+                        <div id="roWrap"></div>
+                    </div>
+                    <div class="decision-actions" id="decisionActions" aria-live="polite"></div>
+                </div>
             `;
             document.getElementById("fb").textContent = generateImplicitFeedback(pendingChoice);
 
@@ -1336,7 +1374,7 @@ function bindChoiceListeners() {
             await animateReadout(old, newS);
             await sleep(1200);
 
-            box.innerHTML += `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
+            document.getElementById("decisionActions").innerHTML = `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
 
             const nextBtn = document.getElementById("nextBtn");
             if (nextBtn) {
