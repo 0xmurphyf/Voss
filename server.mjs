@@ -263,6 +263,29 @@ createServer(async (req, res) => {
       return;
     }
 
+    const nftImageMatch = raw.match(/^\/api\/nft-image\/(0x[0-9a-fA-F]{64})$/);
+    if (nftImageMatch && req.method === "GET") {
+      const response = await fetch(`${voxxstakeApi}/image/${nftImageMatch[1]}`);
+      const contentType = (response.headers.get("content-type") || "").split(";")[0].toLowerCase();
+      const allowed = new Set(["image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp", "image/avif"]);
+      if (!response.ok || !allowed.has(contentType)) {
+        sendJson(res, 502, { detail:"NFT image is unavailable" });
+        return;
+      }
+      const body = Buffer.from(await response.arrayBuffer());
+      if (body.length > 8 * 1024 * 1024) {
+        sendJson(res, 413, { detail:"NFT image is too large" });
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type":contentType,
+        "Content-Length":body.length,
+        "Cache-Control":"public, max-age=3600"
+      });
+      res.end(body);
+      return;
+    }
+
     const relative = raw === "/" ? "index.html" : raw.replace(/^\/+/, "");
     const path = normalize(join(root, relative));
     if (!path.startsWith(root)) throw new Error("invalid path");
