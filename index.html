@@ -1691,7 +1691,7 @@ async function createShareCardImage(outcome, epilogueText) {
 
     const canvas = document.createElement("canvas");
     canvas.width = 720;
-    canvas.height = 620;
+    canvas.height = 700;
     const ctx = canvas.getContext("2d");
 
     // Ending-specific artwork background with a strong readability veil.
@@ -1776,7 +1776,7 @@ async function createShareCardImage(outcome, epilogueText) {
     coreLines.forEach(line => {
         if (line.trim()) {
             ctx.fillText(line.trim(), 44, y, 450);
-            y += 22;
+            y += 34;
         }
     });
 
@@ -1788,7 +1788,7 @@ async function createShareCardImage(outcome, epilogueText) {
     epiLines.forEach((line, i) => {
         if (i < 3 && line.trim()) {
             ctx.fillText(line.trim() + (i < epiLines.length-1 ? "." : ""), 44, y);
-            y += 20;
+            y += 32;
         }
     });
 
