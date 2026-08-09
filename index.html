@@ -142,48 +142,6 @@ button.choice-btn small .delta {
     position:relative;
     z-index:5;
 }
-#telemetry {
-    display:none;
-    position:absolute;
-    top:42px;
-    right:clamp(14px, 2vw, 32px);
-    bottom:58px;
-    width:280px;
-    overflow:hidden;
-    border:1px solid #244351;
-    background:rgba(4,10,14,0.88);
-    box-shadow:0 0 34px rgba(0,100,140,0.1);
-}
-body.case-active #telemetry { display:flex; flex-direction:column; }
-body.case-active #log { margin-right:305px; }
-.telemetry-head {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    padding:11px 12px;
-    border-bottom:1px solid #244351;
-    color:#b9cad1;
-    font-size:11px;
-    letter-spacing:1.3px;
-    cursor:pointer;
-    user-select:none;
-}
-.telemetry-toggle { color:#63d8ff; font-size:14px; line-height:1; }
-body.telemetry-collapsed #telemetry .telemetry-body { display:none; }
-body.telemetry-collapsed #telemetry { bottom:58px; }
-.telemetry-live { color:#78f2b2; }
-.telemetry-body { padding:0 12px; overflow:auto; }
-.telemetry-label { margin:16px 0 8px; color:#71ddfa; font-size:10px; letter-spacing:1.6px; }
-.telemetry-signal { padding:9px; border-left:2px solid #71ddfa; background:#0b141a; color:#dbe8ed; font-size:12px; line-height:1.45; }
-.telemetry-case { color:#b9cad1; font-size:11px; line-height:1.5; }
-.telemetry-metric { margin:10px 0; }
-.telemetry-metric-head { display:flex; justify-content:space-between; color:#cfdee4; font-size:11px; margin-bottom:5px; }
-.telemetry-metric-head span:last-child { font-weight:700; font-size:13px; color:#fff; font-variant-numeric:tabular-nums; }
-.telemetry-rail { height:5px; background:#1a2b33; overflow:hidden; }
-.telemetry-fill { height:100%; background:#6cdefa; transition:width .25s ease,background .25s ease; }
-.telemetry-trail { display:flex; flex-wrap:wrap; gap:5px; }
-.telemetry-tag { padding:4px 6px; border:1px solid #33515d; color:#bed4dc; font-size:9px; letter-spacing:0.9px; }
-.telemetry-node { margin:18px 0 12px; color:#8fa6b0; font-size:10px; letter-spacing:0.7px; }
 #log [style*="color:#888"],
 #log [style*="color: #888"],
 #log [style*="color:#777"],
@@ -435,24 +393,6 @@ body.final-evaluation #log {
         padding:18px 14px;
     }
 }
-@media (max-width: 980px) {
-    #telemetry {
-        display:flex;
-        flex-direction:column;
-        position:fixed;
-        left:8px; right:8px; bottom:8px;
-        top:auto;
-        width:auto;
-        max-height:42vh;
-        z-index:50;
-        border-radius:8px;
-        box-shadow:0 -10px 40px rgba(0,0,0,0.6);
-    }
-    body.case-active #log { margin-right:0; }
-    .telemetry-head::after { content:"▴"; }
-    body.telemetry-collapsed #telemetry { max-height:44px; overflow:hidden; }
-    body.telemetry-collapsed .telemetry-head::after { content:"▾"; }
-}
 </style>
 </head>
 <body>
@@ -476,22 +416,6 @@ Failure is unacceptable.
 </div>
 <div class="test-unlock-hint" id="testHint"></div>
 </div>
-<aside id="telemetry" aria-label="VOSS telemetry">
-    <div class="telemetry-head" id="telemetryHead"><span>VOSS TELEMETRY</span><span class="telemetry-live">● LIVE <span class="telemetry-toggle">▾</span></span></div>
-    <div class="telemetry-body">
-        <div class="telemetry-label">CURRENT CASE</div>
-        <div class="telemetry-case" id="telemetryCase">AWAITING SIMULATION</div>
-        <div class="telemetry-label">SYSTEM INTERPRETATION</div>
-        <div class="telemetry-signal" id="telemetrySignal">Awaiting ethical vector.</div>
-        <div class="telemetry-label">PERSONALITY VECTOR</div>
-        <div class="telemetry-metric"><div class="telemetry-metric-head"><span>COMPASSION</span><span id="telemetryCompassionValue">50</span></div><div class="telemetry-rail"><div class="telemetry-fill" id="telemetryCompassionFill" style="width:50%"></div></div></div>
-        <div class="telemetry-metric"><div class="telemetry-metric-head"><span>CONTROL</span><span id="telemetryControlValue">50</span></div><div class="telemetry-rail"><div class="telemetry-fill" id="telemetryControlFill" style="width:50%"></div></div></div>
-        <div class="telemetry-metric"><div class="telemetry-metric-head"><span>STABILITY</span><span id="telemetryStabilityValue">50</span></div><div class="telemetry-rail"><div class="telemetry-fill" id="telemetryStabilityFill" style="width:50%"></div></div></div>
-        <div class="telemetry-label">DECISION TRACE</div>
-        <div class="telemetry-trail" id="telemetryTrail"></div>
-        <div class="telemetry-node" id="telemetryNode">NODE HK-07</div>
-    </div>
-</aside>
 <button class="reset-btn" id="resetBtn">RESTART</button>
 </div>
 
@@ -666,7 +590,7 @@ function showEndingSimulation(type, callback) {
     const audioButton = document.createElement("button");
     audioButton.className = "audio-enable-btn";
     audioButton.type = "button";
-    audioButton.textContent = "ENABLE AUDIO / 开启声音";
+    audioButton.textContent = "ENABLE AUDIO";
     audioButton.hidden = true;
 
     div.append(video, audioButton);
@@ -722,7 +646,7 @@ function showEndingSimulation(type, callback) {
 
 function resetState(){
     state = { stability:55, freedom:55, transcendence:5, trust:50, threat_awareness:20, unity:30, efficiency:50, compassion:50, pragmatism:50, control:50, evolution:50, event:0 };
-    history_log = []; pendingChoice = null; pendingLabel = ""; submitted = false; finalIdeology = ""; selectedChoiceIndex = -1; currentChoices = []; telemetryPreview = null;
+    history_log = []; pendingChoice = null; pendingLabel = ""; submitted = false; finalIdeology = ""; selectedChoiceIndex = -1; currentChoices = [];
 }
 
 function makeSep(char, pct){
@@ -995,59 +919,6 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const clamp = v => Math.max(0, Math.min(100, v));
 function checkHistory(tag){ if(tag===undefined) return history_log.length; return history_log.filter(h=>h.tag===tag).length; }
 function getLastTag(){ return history_log.length?history_log[history_log.length-1].tag:""; }
-let telemetryPreview = null;
-
-function getTelemetryTag(changes = {}) {
-    const freedom = changes.freedom || 0;
-    const stability = changes.stability || 0;
-    const control = changes.control || 0;
-    const evolution = changes.evolution || 0;
-    const threat = changes.threat_awareness || 0;
-    if (control >= 15 && freedom <= -10) return "SUBDUE";
-    if (freedom >= 10 && stability <= -10) return "PROTECT";
-    if (freedom >= 10 && stability >= -5) return "LIBERATE";
-    if (control >= 10 && freedom <= -5) return "CONTROL";
-    if (evolution >= 15) return "EMBRACE";
-    if (threat >= 10) return "FEAR";
-    if (stability >= 10) return "STABILIZE";
-    if (freedom >= 5) return "PRESERVE";
-    return "NEUTRAL";
-}
-
-function getTelemetrySignal(changes = {}) {
-    if (!Object.keys(changes).length) return "Awaiting ethical vector. VOSS is observing your hesitation.";
-    if ((changes.control || 0) >= 10) return "CONTROL vector detected. VOSS recognizes decisive resource allocation.";
-    if ((changes.compassion || 0) >= 8) return "HUMAN-CENTRIC vector detected. VOSS registers elevated collective risk.";
-    if ((changes.stability || 0) >= 8) return "STABILITY vector detected. VOSS registers continuity as the priority.";
-    if ((changes.evolution || 0) >= 10) return "EVOLUTION vector detected. VOSS is recalibrating the human threshold.";
-    if ((changes.freedom || 0) >= 8) return "LIBERATION vector detected. VOSS registers resistance to system pressure.";
-    return "Mixed vector detected. VOSS requires a clearer pattern.";
-}
-
-function renderTelemetry(preview = telemetryPreview, eventIndex = state.event) {
-    const telemetry = document.getElementById("telemetry");
-    if (!telemetry || !state || eventIndex >= events.length) return;
-    const currentEvent = events[eventIndex];
-    document.getElementById("telemetryCase").textContent = `CASE ${String(eventIndex + 1).padStart(2, "0")} / ${currentEvent.classification || "ETHICAL THRESHOLD"}`;
-    document.getElementById("telemetrySignal").textContent = getTelemetrySignal(preview || {});
-
-    const displayState = {
-        compassion: clamp(state.compassion + (preview?.compassion || 0)),
-        control: clamp(state.control + (preview?.control || 0)),
-        stability: clamp(state.stability + (preview?.stability || 0))
-    };
-    [["Compassion", displayState.compassion], ["Control", displayState.control], ["Stability", displayState.stability]].forEach(([name, value]) => {
-        document.getElementById(`telemetry${name}Value`).textContent = value;
-        document.getElementById(`telemetry${name}Fill`).style.width = `${value}%`;
-    });
-
-    const tags = history_log.slice(-3).map(item => item.tag);
-    if (preview) tags.push(getTelemetryTag(preview));
-    const trail = document.getElementById("telemetryTrail");
-    trail.innerHTML = (tags.slice(-3).length ? tags.slice(-3) : ["AWAITING"]).map(tag => `<span class="telemetry-tag">${tag}</span>`).join("");
-    document.getElementById("telemetryNode").textContent = `NODE HK-07 · CANDIDATE #${getPaddedNumber()}`;
-}
-
 function applyChange(changes, label){
     for(let k in changes){
         if(k==="finalIdeology"){ finalIdeology=changes[k]; continue; }
@@ -1234,7 +1105,6 @@ async function render(){
     const box=document.getElementById("log");
     const isFinalEvaluation = state.event >= events.length;
     document.body.classList.toggle("final-evaluation", isFinalEvaluation);
-    document.body.classList.toggle("case-active", !isFinalEvaluation);
     if(state.event>=events.length){
         const out = evaluateCandidate();
         let animType = out.type==="NEW"?"P":out.type;
@@ -1272,8 +1142,6 @@ async function render(){
     }
 
     const e=events[state.event];
-    telemetryPreview = null;
-    renderTelemetry();
     const textContent = typeof e.text==='function'?e.text():e.text;
 
     // Dynamic classification
@@ -1298,13 +1166,13 @@ async function render(){
     e.choices.forEach((c, idx) => {
         const plain=c[0].replace(/<[^>]+>/g,' ').trim();
         const ch=c[1]||{};
-        // 风险等级: 控制/稳定大幅变动 = high; 中等 = mid; 轻微 = low
+        // Risk classification is based on the largest state change.
         const mag = Math.max(
             Math.abs(ch.control||0), Math.abs(ch.stability||0),
             Math.abs(ch.compassion||0), Math.abs(ch.freedom||0)
         );
         const riskCls = mag>=15 ? 'risk-high' : mag>=8 ? 'risk-mid' : 'risk-low';
-        // 后果预览: 取前两个最显著的维度变动
+        // Preview the two most significant state changes.
         const deltas = Object.entries(ch)
             .filter(([k,v])=>typeof v==='number' && v!==0 && !['finalIdeology'].includes(k))
             .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
@@ -1313,7 +1181,7 @@ async function render(){
             .join('  ');
         bh+=`<button class="choice-btn ${riskCls}" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
             <span style="color:#63d8ff; margin-right:8px;">> OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
-            ${deltas?`<small>后果预览: <span class="delta">${deltas}</span></small>`:''}
+            ${deltas?`<small>IMPACT PREVIEW: <span class="delta">${deltas}</span></small>`:''}
         </button>`;
     });
     document.getElementById("choiceList").innerHTML=bh;
@@ -1335,8 +1203,6 @@ function bindChoiceListeners() {
             selectedChoiceIndex = idx;
             pendingChoice = JSON.parse(btn.dataset.choice);
             pendingLabel = btn.dataset.label;
-            telemetryPreview = pendingChoice;
-            renderTelemetry();
 
             document.getElementById("submitBtn").disabled = false;
             playBeep(920, 60, 'sine', 0.02);
@@ -1417,8 +1283,6 @@ document.addEventListener("keydown", (e) => {
         if (selectedBtn) {
             pendingChoice = JSON.parse(selectedBtn.dataset.choice);
             pendingLabel = selectedBtn.dataset.label;
-            telemetryPreview = pendingChoice;
-            renderTelemetry();
             document.getElementById("submitBtn").disabled = false;
             playBeep(880, 40, 'sine', 0.015);
         }
@@ -1656,10 +1520,6 @@ async function createShareCardImage(outcome, epilogueText) {
 }
 
 async function boot(){
-    // 遥测面板折叠交互(desktop 侧栏 / mobile 抽屉通用)
-    const th = document.getElementById("telemetryHead");
-    if (th) th.addEventListener("click", () => document.body.classList.toggle("telemetry-collapsed"));
-
     resetState();
     document.body.classList.remove("final-evaluation");
     clearFinalEvaluationBackground();
