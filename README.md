@@ -26,5 +26,13 @@ including direct holdings and unlisted Kiosk holdings. Set the optional
 https://voxx.up.railway.app/api
 ```
 
-Only a wallet with a currently owned VOXX NFT may begin. The selected NFT's
+Add a Railway PostgreSQL service and set:
+
+```text
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+```
+
+Only a wallet with a currently owned VOXX NFT may begin. Starting reserves
+that NFT's single attempt. Progress is recorded after every case, and the NFT
+is permanently marked completed before Final is displayed. The selected NFT's
 number becomes the candidate number throughout the simulation.

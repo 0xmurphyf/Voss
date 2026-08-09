@@ -408,10 +408,12 @@ body.final-evaluation #log {
     button.choice-btn { padding:13px 10px 13px 18px; min-height:46px; line-height:1.35; }
     .decision-actions { min-height:60px; padding-top:7px; }
     .case-layout { display:flex; flex-direction:column; gap:12px; }
-    .candidate-nft { position:static; width:100%; display:grid; grid-template-columns:82px 1fr; gap:10px; text-align:left; align-items:center; }
+    .candidate-nft { order:-1; position:static; width:100%; display:grid; grid-template-columns:82px 1fr; gap:10px; text-align:left; align-items:center; }
     .candidate-nft img { width:82px; }
     .candidate-nft-label { margin-top:0; }
     .wallet-list, .nft-selector { grid-template-columns:1fr 1fr; }
+    #nftSelection { display:flex; flex-direction:column; }
+    #nftSelection .gate-actions { order:-1; margin:8px 0 14px; }
     body.final-evaluation #terminal { height:calc(100dvh - 8px); }
     .share-modal { padding:10px; }
     .share-modal .content {
@@ -444,6 +446,10 @@ let connectedWallet = null;
 let connectedAccount = null;
 let gateAuthToken = null;
 let testShortcutClicks = 0;
+let activeScanToken = null;
+let activeAttemptToken = null;
+let finalRecorded = false;
+let isTestMode = false;
 
 function getPaddedNumber() {
     return candidateNumber !== null && candidateNumber !== undefined
@@ -493,6 +499,7 @@ function showTestEndingMenu() {
     modal.querySelectorAll("[data-test-ending]").forEach(button => {
         button.onclick = () => {
             const type = button.dataset.testEnding;
+            isTestMode = true;
             resetState();
             if (type === "A") {
                 Object.assign(state,{stability:60,transcendence:30,pragmatism:50,control:40,compassion:50,trust:55,event:events.length});
@@ -555,6 +562,53 @@ async function apiJson(path, options = {}) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || data.error || `Request failed (${response.status})`);
     return data;
+}
+
+async function startNftAttempt() {
+    const result = await apiJson("/api/attempt/start", {
+        method:"POST",
+        body:JSON.stringify({
+            scanToken:activeScanToken,
+            objectId:selectedNft.objectId,
+            number:selectedNft.number,
+            name:selectedNft.name,
+            address:connectedAccount?.address || null
+        })
+    });
+    activeAttemptToken = result.attemptToken;
+    finalRecorded = false;
+}
+
+async function recordAttemptProgress() {
+    if (isTestMode || !activeAttemptToken || !selectedNft) return;
+    await apiJson("/api/attempt/progress", {
+        method:"POST",
+        body:JSON.stringify({
+            objectId:selectedNft.objectId,
+            attemptToken:activeAttemptToken,
+            completedCases:state.event,
+            progress:{ state, history:history_log, finalIdeology }
+        })
+    });
+}
+
+async function completeNftAttempt(outcome) {
+    if (isTestMode || finalRecorded) return;
+    await recordAttemptProgress();
+    await apiJson("/api/attempt/complete", {
+        method:"POST",
+        body:JSON.stringify({
+            objectId:selectedNft.objectId,
+            attemptToken:activeAttemptToken,
+            finalOutcome:{
+                name:outcome.name,
+                type:outcome.type,
+                candidateNumber:getPaddedNumber(),
+                history:history_log
+            }
+        })
+    });
+    finalRecorded = true;
 }
 
 async function connectAndScan(wallet, setStatus) {
@@ -633,6 +687,7 @@ function saveState() {
             finalIdeology: finalIdeology,
             candidateNumber: candidateNumber,
             selectedNft: selectedNft,
+            attemptToken: activeAttemptToken,
             event: state.event || 0,
             timestamp: Date.now()
         };
@@ -1235,6 +1290,18 @@ async function render(){
     document.body.classList.toggle("final-evaluation", isFinalEvaluation);
     if(state.event>=events.length){
         const out = evaluateCandidate();
+        try {
+            await completeNftAttempt(out);
+        } catch (error) {
+            document.body.classList.remove("final-evaluation");
+            box.innerHTML = `<div class="gate-panel">
+                <h2>FINAL RECORD PENDING</h2>
+                <div class="gate-status">${escapeHTML(error.message || "Unable to record the completed attempt.")}</div>
+                <button id="retryFinalBtn" style="text-align:center;">RETRY FINAL RECORD</button>
+            </div>`;
+            document.getElementById("retryFinalBtn").onclick = () => render();
+            return;
+        }
         let animType = out.type==="NEW"?"P":out.type;
         showEndingSimulation(animType, async () => {
             setFinalEvaluationBackground(out);
@@ -1370,17 +1437,34 @@ function bindChoiceListeners() {
             await animateReadout(old, newS);
             await sleep(1200);
 
-            document.getElementById("decisionActions").innerHTML = `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
-
-            const nextBtn = document.getElementById("nextBtn");
-            if (nextBtn) {
-                nextBtn.onclick = () => {
+            const installNextButton = () => {
+                document.getElementById("decisionActions").innerHTML = `<button id="nextBtn">PROCEED TO NEXT PHASE</button>`;
+                document.getElementById("nextBtn").onclick = () => {
                     submitted = false;
                     pendingChoice = null;
                     pendingLabel = "";
                     selectedChoiceIndex = -1;
                     currentChoices = [];
                     render();
+                };
+            };
+            try {
+                await recordAttemptProgress();
+                installNextButton();
+            } catch (error) {
+                const actions = document.getElementById("decisionActions");
+                actions.innerHTML = `<button id="retryProgressBtn">RETRY RECORDING CASE ${state.event}</button>`;
+                document.getElementById("retryProgressBtn").onclick = async () => {
+                    const retry = document.getElementById("retryProgressBtn");
+                    retry.disabled = true;
+                    retry.textContent = "RECORDING...";
+                    try {
+                        await recordAttemptProgress();
+                        installNextButton();
+                    } catch (retryError) {
+                        retry.disabled = false;
+                        retry.textContent = `RETRY FAILED — ${retryError.message || "TRY AGAIN"}`;
+                    }
                 };
             }
         };
@@ -1674,6 +1758,7 @@ async function boot(){
     const setStatus = message => { status.textContent = message; };
 
     const showNfts = scan => {
+        activeScanToken = scan.scanToken || null;
         if (!Array.isArray(scan.nfts) || scan.nfts.length === 0) {
             selection.innerHTML = "";
             setStatus(scan.scanPartial
@@ -1684,10 +1769,16 @@ async function boot(){
         setStatus(`OWNERSHIP VERIFIED. SELECT ONE OF ${scan.nfts.length} NFT${scan.nfts.length === 1 ? "" : "S"} AS YOUR CANDIDATE.`);
         selection.innerHTML = `<div class="nft-selector">${scan.nfts.map((nft, index) => {
             const image = safeImageUrl(nft.imageUrl);
+            const attemptLabel = nft.attemptStatus === "completed"
+                ? "COMPLETED — NO ATTEMPTS REMAINING"
+                : nft.attemptStatus === "started"
+                    ? `IN PROGRESS — ${nft.completedCases}/12`
+                    : "ONE ATTEMPT AVAILABLE";
             return `<button class="nft-option" data-nft-index="${index}">
                 ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(nft.name)}">` : `<div style="aspect-ratio:1;display:grid;place-items:center;color:#596673;">NO IMAGE</div>`}
                 <span>${escapeHTML(nft.name)}</span>
-                <small>CANDIDATE #${escapeHTML(nft.number)}</small>
+                <small class="candidate-nft-label">CANDIDATE #${escapeHTML(nft.number)}</small>
+                <small>${attemptLabel}</small>
             </button>`;
         }).join("")}</div><div class="gate-actions" id="gateActions"></div>`;
 
@@ -1698,13 +1789,26 @@ async function boot(){
                 selectedNft = scan.nfts[Number(button.dataset.nftIndex)];
                 candidateNumber = selectedNft.number;
                 testShortcutClicks = 0;
-                const canResume = savedData?.selectedNft?.objectId === selectedNft.objectId;
-                document.getElementById("gateActions").innerHTML = `
-                    ${canResume ? `<button id="continueBtn" style="text-align:center;">CONTINUE CASE ${savedData.event}</button>` : ""}
-                    <button id="beginBtn" style="text-align:center;">${canResume ? "START NEW SIMULATION" : "BEGIN SIMULATION"}</button>
-                `;
+                const canResume = selectedNft.attemptStatus === "started" &&
+                    savedData?.selectedNft?.objectId === selectedNft.objectId &&
+                    typeof savedData.attemptToken === "string";
+                const actions = document.getElementById("gateActions");
+                if (selectedNft.attemptStatus === "completed") {
+                    actions.innerHTML = `<div class="gate-status">FINAL ALREADY RECORDED. THIS NFT HAS NO ATTEMPTS REMAINING.</div>`;
+                    return;
+                }
+                if (selectedNft.attemptStatus === "started" && !canResume) {
+                    actions.innerHTML = `<div class="gate-status">THIS NFT'S ONLY ATTEMPT IS ALREADY IN PROGRESS ON ITS ORIGINAL SESSION.</div>`;
+                    return;
+                }
+                actions.innerHTML = canResume
+                    ? `<button id="continueBtn" style="text-align:center;">CONTINUE CASE ${savedData.event}</button>`
+                    : `<button id="beginBtn" style="text-align:center;">BEGIN SIMULATION — USE ONLY ATTEMPT</button>`;
                 const continueBtn = document.getElementById("continueBtn");
                 if (continueBtn) continueBtn.onclick = () => {
+                    activeAttemptToken = savedData.attemptToken;
+                    finalRecorded = false;
+                    isTestMode = false;
                     state = { ...savedData.state };
                     history_log = savedData.history_log || [];
                     finalIdeology = savedData.finalIdeology || "";
@@ -1716,12 +1820,23 @@ async function boot(){
                     playBeep(720, 60);
                     render();
                 };
-                document.getElementById("beginBtn").onclick = event => {
+                const beginBtn = document.getElementById("beginBtn");
+                if (beginBtn) beginBtn.onclick = async event => {
                     event.stopPropagation();
-                    clearSave();
-                    resetState();
-                    playBeep(850, 80);
-                    render();
+                    beginBtn.disabled = true;
+                    beginBtn.textContent = "RESERVING NFT ATTEMPT...";
+                    try {
+                        await startNftAttempt();
+                        clearSave();
+                        resetState();
+                        isTestMode = false;
+                        saveState();
+                        playBeep(850, 80);
+                        render();
+                    } catch (error) {
+                        beginBtn.disabled = false;
+                        beginBtn.textContent = `ATTEMPT UNAVAILABLE — ${error.message || "RETRY"}`;
+                    }
                 };
             };
         });
@@ -1763,7 +1878,7 @@ async function boot(){
 /* ===== MAIN EVENT LISTENERS ===== */
 document.getElementById("log").addEventListener("click", async e=>{
     const candidateLabel=e.target.closest(".candidate-nft-label");
-    if(candidateLabel && selectedNft){
+    if(candidateLabel && selectedNft && !activeAttemptToken){
         testShortcutClicks++;
         if(testShortcutClicks>=7){
             testShortcutClicks=0;
@@ -1810,7 +1925,7 @@ resetBtn.addEventListener("click",e=>{
         return;
     }
     resetToDefault();
-    clearSave();
+    if (!activeAttemptToken || finalRecorded || isTestMode) clearSave();
     location.reload();
 });
 resetBtn.addEventListener("mouseleave",()=>{ if(resetBtn.classList.contains("confirm")) resetToDefault(); });
