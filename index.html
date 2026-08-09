@@ -536,7 +536,7 @@ function candidateNftHTML() {
 }
 
 function showTestEndingMenu() {
-    if (!selectedNft || document.getElementById("testEndingModal")) return;
+    if (document.getElementById("testEndingModal")) return;
     const modal = document.createElement("div");
     modal.className = "share-modal";
     modal.id = "testEndingModal";
@@ -553,6 +553,10 @@ function showTestEndingMenu() {
         button.onclick = () => {
             const type = button.dataset.testEnding;
             isTestMode = true;
+            if (!selectedNft) {
+                selectedNft = { objectId:"", number:"TEST", name:"TEST CANDIDATE", imageUrl:"" };
+                candidateNumber = "TEST";
+            }
             resetState();
             if (type === "A") {
                 Object.assign(state,{stability:60,transcendence:30,pragmatism:50,control:40,compassion:50,trust:55,event:events.length});
@@ -1608,7 +1612,7 @@ function generateShareCard(outcome, epilogueText) {
             <h3 style="color:#63d8ff; margin-bottom:14px;">Generate Share Card</h3>
 
             <div style="margin-bottom:18px; text-align:left;">
-                <div style="color:#888; font-size:13px; margin-bottom:6px;">Do you still remember your real name?</div>
+                <div style="color:#888; font-size:13px; margin-bottom:6px;">Do you still remember your real name?(OPTIONAL)</div>
                 <input id="nameInput" type="text" placeholder="Enter your name (optional)"
                        style="width:100%; padding:9px 11px; background:#0c0c0c; border:1px solid #1c1c1c; color:#e8e8e8; font-family:inherit; font-size:14px;">
             </div>
@@ -1811,7 +1815,8 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.fillStyle = "#81909e";
     ctx.font = "10.5px 'Space Mono', monospace";
     const generatedAt = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
-    ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + generatedAt, 44, canvas.height - 46);
+    const footerY = Math.min(canvas.height - 46, y + 142);
+    ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + generatedAt, 44, footerY);
 
     modal.innerHTML = `
         <div class="content">
@@ -1855,7 +1860,7 @@ async function boot(){
     box.innerHTML = `
         <div class="gate-panel">
             <div style="color:#63d8ff; letter-spacing:4px; font-size:13px; margin-bottom:8px;">VOXX INC.</div>
-            <h2 style="margin-bottom:6px;">VOSS PROTOCOL</h2>
+            <h2 id="preWalletShortcut" style="margin-bottom:6px;cursor:default;user-select:none;">VOSS PROTOCOL</h2>
             <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:20px;">NFT-RESTRICTED EXECUTIVE SELECTION SYSTEM</div>
             <div class="gate-status" id="gateStatus">CONNECT A SUI WALLET TO VERIFY VOXX OWNERSHIP.</div>
             <button id="findWalletsBtn" style="text-align:center;">CONNECT SUI WALLET</button>
@@ -1981,8 +1986,8 @@ async function boot(){
 
 /* ===== MAIN EVENT LISTENERS ===== */
 document.getElementById("log").addEventListener("click", async e=>{
-    const candidateLabel=e.target.closest(".candidate-nft-label");
-    if(candidateLabel && selectedNft && !activeAttemptToken){
+    const preWalletShortcut=e.target.closest("#preWalletShortcut");
+    if(preWalletShortcut && !connectedAccount){
         testShortcutClicks++;
         if(testShortcutClicks>=7){
             testShortcutClicks=0;
