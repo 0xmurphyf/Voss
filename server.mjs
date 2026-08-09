@@ -219,6 +219,37 @@ createServer(async (req, res) => {
       return;
     }
 
+    if (raw === "/api/attempt/resume" && req.method === "POST") {
+      if (!requireAttemptsDatabase(res)) return;
+      const body = await readJsonBody(req);
+      const verified = verifiedScans.get(String(body.scanToken || ""));
+      if (!verified || verified.expiresAt <= Date.now() || !verified.objectIds.has(body.objectId)) {
+        sendJson(res, 403, { detail:"A fresh ownership scan is required" });
+        return;
+      }
+      await attemptsReady;
+      const attemptToken = randomBytes(32).toString("hex");
+      const resumed = await pool.query(
+        `UPDATE voss_nft_attempts
+         SET attempt_token_hash=$1, wallet_address=COALESCE($2,wallet_address), updated_at=NOW()
+         WHERE object_id=$3 AND status='started'
+         RETURNING completed_cases, progress`,
+        [tokenHash(attemptToken), body.address || null, body.objectId]
+      );
+      if (!resumed.rowCount) {
+        sendJson(res, 409, { detail:"No unfinished attempt is available" });
+        return;
+      }
+      verifiedScans.delete(String(body.scanToken));
+      sendJson(res, 200, {
+        attemptToken,
+        status:"started",
+        completedCases:Number(resumed.rows[0].completed_cases || 0),
+        progress:resumed.rows[0].progress || null
+      });
+      return;
+    }
+
     if (raw === "/api/attempt/progress" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
       const body = await readJsonBody(req);

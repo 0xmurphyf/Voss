@@ -33,6 +33,7 @@ DATABASE_URL=${{Postgres.DATABASE_URL}}
 ```
 
 Only a wallet with a currently owned VOXX NFT may begin. Starting reserves
-that NFT's single attempt. Progress is recorded after every case, and the NFT
-is permanently marked completed before Final is displayed. The selected NFT's
-number becomes the candidate number throughout the simulation.
+that NFT's single attempt, and unfinished attempts can continue after a fresh
+ownership scan. Progress is recorded after every case. The NFT is permanently
+marked completed only after the full Final Evaluation is displayed. The
+selected NFT's number becomes the candidate number throughout the simulation.
