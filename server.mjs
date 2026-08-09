@@ -4,28 +4,7 @@ import { extname, join, normalize } from "node:path";
 
 const root = process.cwd();
 const port = Number.parseInt(process.env.PORT || "4173", 10);
-let developmentCounter = 1499;
-let pool = null;
-let counterReady = Promise.resolve();
-
-if (process.env.DATABASE_URL) {
-  const { Pool } = await import("pg");
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.PGSSLMODE === "disable"
-      ? false
-      : { rejectUnauthorized: false }
-  });
-  counterReady = pool.query(`
-    CREATE TABLE IF NOT EXISTS voss_counters (
-      name TEXT PRIMARY KEY,
-      value BIGINT NOT NULL
-    );
-    INSERT INTO voss_counters (name, value)
-    VALUES ('candidate', 1499)
-    ON CONFLICT (name) DO NOTHING;
-  `);
-}
+const voxxstakeApi = (process.env.VOXXSTAKE_API_URL || "https://voxx.up.railway.app/api").replace(/\/$/, "");
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -36,43 +15,94 @@ const types = {
   ".mp4": "video/mp4"
 };
 
+async function readJsonBody(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 64 * 1024) throw new Error("request body too large");
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+}
+
+function sendJson(res, status, body) {
+  const encoded = Buffer.from(JSON.stringify(body));
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Content-Length": encoded.length,
+    "Cache-Control": "no-store"
+  });
+  res.end(encoded);
+}
+
+async function proxyVoxxstake(path, body, authorization) {
+  const response = await fetch(`${voxxstakeApi}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      ...(authorization ? { Authorization: authorization } : {})
+    },
+    body: JSON.stringify(body || {})
+  });
+  const data = await response.json().catch(() => ({ detail: "Invalid response from ownership service" }));
+  return { status: response.status, data };
+}
+
+function nftNumber(position) {
+  const name = String(position.name || "");
+  const explicit = name.match(/#\s*0*(\d+)/);
+  if (explicit) return explicit[1];
+  const trailing = name.match(/(?:^|\D)0*(\d+)\s*$/);
+  if (trailing) return trailing[1];
+  return String(position.object_id || "").slice(-6).toUpperCase();
+}
+
 createServer(async (req, res) => {
   let requestedPath = "";
   try {
     const raw = decodeURIComponent((req.url || "/").split("?")[0]);
     requestedPath = raw;
 
-    if (raw === "/api/candidate/allocate" && req.method === "POST") {
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
+    if (raw === "/api/gate/nonce" && req.method === "POST") {
+      const upstream = await proxyVoxxstake("/auth/nonce", await readJsonBody(req));
+      sendJson(res, upstream.status, upstream.data);
+      return;
+    }
 
-      if (pool) {
-        await counterReady;
-        const result = await pool.query(`
-          UPDATE voss_counters
-          SET value = value + 1
-          WHERE name = 'candidate'
-          RETURNING value
-        `);
-        res.writeHead(200);
-        res.end(JSON.stringify({ candidateNumber: Number(result.rows[0].value) }));
+    if (raw === "/api/gate/verify" && req.method === "POST") {
+      const upstream = await proxyVoxxstake("/auth/verify", await readJsonBody(req));
+      sendJson(res, upstream.status, upstream.data);
+      return;
+    }
+
+    if (raw === "/api/gate/scan" && req.method === "POST") {
+      const authorization = req.headers.authorization || "";
+      if (!authorization.startsWith("Bearer ")) {
+        sendJson(res, 401, { detail: "Wallet authentication required" });
         return;
       }
-
-      if (!process.env.RAILWAY_ENVIRONMENT) {
-        developmentCounter += 1;
-        res.writeHead(200);
-        res.end(JSON.stringify({
-          candidateNumber: developmentCounter,
-          developmentFallback: true
+      const upstream = await proxyVoxxstake("/staking/sync", {}, authorization);
+      if (upstream.status >= 400) {
+        sendJson(res, upstream.status, upstream.data);
+        return;
+      }
+      const positions = Array.isArray(upstream.data.positions) ? upstream.data.positions : [];
+      const scanPartial = upstream.data.scan_partial === true;
+      const nfts = scanPartial ? [] : positions
+        .filter((position) => position && position.is_owned === true)
+        .map((position) => ({
+          objectId: position.object_id,
+          name: position.name || `VOXX #${String(position.object_id || "").slice(-6)}`,
+          imageUrl: position.image_url || null,
+          number: nftNumber(position)
         }));
-        return;
-      }
-
-      res.writeHead(503);
-      res.end(JSON.stringify({
-        error: "Global candidate counter requires DATABASE_URL"
-      }));
+      sendJson(res, 200, {
+        nfts,
+        scanPartial,
+        count: nfts.length
+      });
       return;
     }
 
@@ -119,13 +149,9 @@ createServer(async (req, res) => {
     });
     res.end(body);
   } catch (error) {
-    if (requestedPath === "/api/candidate/allocate") {
-      console.error("Candidate allocation failed:", error);
-      res.writeHead(500, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store"
-      });
-      res.end(JSON.stringify({ error: "Global counter is temporarily unavailable" }));
+    if (requestedPath.startsWith("/api/gate/")) {
+      console.error("NFT gate request failed:", error);
+      sendJson(res, 502, { detail: "Ownership service is temporarily unavailable" });
       return;
     }
     res.writeHead(404);

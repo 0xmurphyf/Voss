@@ -96,10 +96,6 @@ button.choice-btn small {
     display: block;
     letter-spacing: 0.3px;
 }
-button.choice-btn small .delta {
-    color: var(--risk);
-    font-variant-numeric: tabular-nums;
-}
 .option-label {
     color: #63d8ff;
     font-size: 0.78em;
@@ -142,6 +138,40 @@ button.choice-btn small .delta {
     position:relative;
     z-index:5;
 }
+.case-layout {
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) minmax(190px, 260px);
+    gap:clamp(18px, 3vw, 42px);
+    align-items:start;
+}
+.case-copy { min-width:0; }
+.candidate-nft {
+    position:sticky;
+    top:4px;
+    border:1px solid #263744;
+    background:#080c11;
+    padding:10px;
+    text-align:center;
+}
+.candidate-nft img {
+    display:block;
+    width:100%;
+    aspect-ratio:1;
+    object-fit:cover;
+    background:#020407;
+    border:1px solid #18232d;
+}
+.candidate-nft-label { margin-top:9px; color:#63d8ff; font-size:11px; letter-spacing:1.5px; cursor:pointer; user-select:none; }
+.candidate-nft-name { margin-top:5px; color:#d7dde2; font-size:12px; overflow-wrap:anywhere; }
+.gate-panel { max-width:760px; margin:0 auto; text-align:center; padding:14px 4px; }
+.gate-status { margin:18px 0; padding:12px; border:1px solid #263744; background:#080c11; color:#c1c8cf; line-height:1.55; }
+.wallet-list, .nft-selector { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:14px 0; }
+.wallet-option { text-align:center; }
+.nft-option { padding:8px; text-align:center; border-left:1px solid #34414d; }
+.nft-option img { width:100%; aspect-ratio:1; object-fit:cover; display:block; margin-bottom:8px; background:#020407; }
+.nft-option.selected { border-color:#63d8ff; background:#10202a; }
+.nft-option small { overflow-wrap:anywhere; }
+.gate-actions { display:grid; gap:8px; margin-top:16px; }
 #log [style*="color:#888"],
 #log [style*="color: #888"],
 #log [style*="color:#777"],
@@ -155,15 +185,6 @@ button.choice-btn small .delta {
 .reset-btn::before { content:""; }
 .reset-btn:hover { border-color:#8b3a3a; color:#8b3a3a; }
 .reset-btn.confirm { border-color:#8b3a3a; color:#8b3a3a; background:#111; }
-
-.test-mode { display: none; }
-.test-mode.unlocked { display: block; }
-.test-unlock-hint {
-    color:#aeb7c0; font-size:12px; letter-spacing:1px;
-    text-align: center; margin-top: 5px; user-select: none;
-    transition: color 0.3s;
-}
-.test-unlock-hint.armed { color: #8b3a3a; }
 
 .feedbackFadeIn {
     animation: feedbackFadeIn 0.8s ease-out;
@@ -386,6 +407,11 @@ body.final-evaluation #log {
     button, .choice-btn { font-size:14px; padding:13px 10px; min-height:46px; }
     button.choice-btn { padding:13px 10px 13px 18px; min-height:46px; line-height:1.35; }
     .decision-actions { min-height:60px; padding-top:7px; }
+    .case-layout { display:flex; flex-direction:column; gap:12px; }
+    .candidate-nft { position:static; width:100%; display:grid; grid-template-columns:82px 1fr; gap:10px; text-align:left; align-items:center; }
+    .candidate-nft img { width:82px; }
+    .candidate-nft-label { margin-top:0; }
+    .wallet-list, .nft-selector { grid-template-columns:1fr 1fr; }
     body.final-evaluation #terminal { height:calc(100dvh - 8px); }
     .share-modal { padding:10px; }
     .share-modal .content {
@@ -406,42 +432,165 @@ You are being evaluated.<br><br>
 Failure is unacceptable.
 <br><br>
 <button id="beginBtn">BEGIN SIMULATION</button>
-<br>
-<div class="test-mode" id="testModeBlock">
-    <div class="dim" style="margin-bottom:4px;">TEST MODE</div>
-    <button id="testA">TEST: ACCEPTABLE VOSS CANDIDATE</button>
-    <button id="testB">TEST: TOO WEAK FOR HUMANITY</button>
-    <button id="testC">TEST: ABSOLUTE VOSS</button>
-    <button id="testP">TEST: PERFECT VOSS</button>
-</div>
-<div class="test-unlock-hint" id="testHint"></div>
 </div>
 <button class="reset-btn" id="resetBtn">RESTART</button>
 </div>
 
 <script>
-/* ===== Global Candidate Counter ===== */
+/* ===== NFT CANDIDATE GATE ===== */
 let candidateNumber = null;
-
-async function allocateCandidateNumber() {
-    if (Number.isInteger(candidateNumber)) return candidateNumber;
-
-    const response = await fetch("/api/candidate/allocate", {
-        method: "POST",
-        headers: { "Accept": "application/json" }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !Number.isInteger(data.candidateNumber)) {
-        throw new Error(data.error || "Unable to allocate a global candidate number.");
-    }
-    candidateNumber = data.candidateNumber;
-    return candidateNumber;
-}
+let selectedNft = null;
+let connectedWallet = null;
+let connectedAccount = null;
+let gateAuthToken = null;
+let testShortcutClicks = 0;
 
 function getPaddedNumber() {
-    return Number.isInteger(candidateNumber)
-        ? String(candidateNumber).padStart(4, '0')
+    return candidateNumber !== null && candidateNumber !== undefined
+        ? String(candidateNumber)
         : "PENDING";
+}
+
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, char => ({
+        "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;"
+    })[char]);
+}
+
+function safeImageUrl(value) {
+    try {
+        const url = new URL(String(value));
+        return url.protocol === "https:" || url.protocol === "http:" ? url.href : "";
+    } catch { return ""; }
+}
+
+function candidateNftHTML() {
+    if (!selectedNft) return "";
+    const image = safeImageUrl(selectedNft.imageUrl);
+    return `<aside class="candidate-nft" aria-label="Selected candidate NFT">
+        ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(selectedNft.name)}">` : `<div style="aspect-ratio:1;display:grid;place-items:center;color:#596673;border:1px solid #18232d;">NO IMAGE</div>`}
+        <div>
+            <div class="candidate-nft-label">CANDIDATE #${escapeHTML(getPaddedNumber())}</div>
+            <div class="candidate-nft-name">${escapeHTML(selectedNft.name)}</div>
+        </div>
+    </aside>`;
+}
+
+function showTestEndingMenu() {
+    if (!selectedNft || document.getElementById("testEndingModal")) return;
+    const modal = document.createElement("div");
+    modal.className = "share-modal";
+    modal.id = "testEndingModal";
+    modal.innerHTML = `<div class="content">
+        <h3 style="color:#63d8ff;margin-bottom:14px;">TEST MODE</h3>
+        <button data-test-ending="A">ACCEPTABLE VOSS CANDIDATE</button>
+        <button data-test-ending="B">TOO WEAK FOR HUMANITY</button>
+        <button data-test-ending="C">ABSOLUTE VOSS</button>
+        <button data-test-ending="P">PERFECT VOSS</button>
+        <button id="closeTestEnding">CANCEL</button>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll("[data-test-ending]").forEach(button => {
+        button.onclick = () => {
+            const type = button.dataset.testEnding;
+            resetState();
+            if (type === "A") {
+                Object.assign(state,{stability:60,transcendence:30,pragmatism:50,control:40,compassion:50,trust:55,event:events.length});
+                finalIdeology="BALANCE";
+            } else if (type === "B") {
+                Object.assign(state,{stability:20,transcendence:5,pragmatism:10,control:10,compassion:80,event:events.length});
+            } else if (type === "C") {
+                Object.assign(state,{stability:80,transcendence:90,pragmatism:80,control:95,compassion:20,trust:70,event:events.length});
+                finalIdeology="PROTECTION";
+            } else {
+                Object.assign(state,{stability:80,transcendence:70,pragmatism:80,control:55,compassion:80,trust:75,event:events.length});
+                finalIdeology="BALANCE";
+            }
+            clearSave();
+            modal.remove();
+            render();
+        };
+    });
+    modal.querySelector("#closeTestEnding").onclick = () => modal.remove();
+    modal.onclick = event => { if (event.target === modal) modal.remove(); };
+}
+
+function createWalletRegistry() {
+    const wallets = [];
+    const register = (...entries) => {
+        entries.flat().forEach(wallet => {
+            if (wallet && !wallets.includes(wallet)) wallets.push(wallet);
+        });
+    };
+    window.addEventListener("wallet-standard:register-wallet", event => {
+        if (typeof event.detail === "function") event.detail({ register });
+    });
+    window.dispatchEvent(new CustomEvent("wallet-standard:app-ready", {
+        detail: { register }
+    }));
+    const legacyCallbacks = window.navigator.wallets;
+    if (Array.isArray(legacyCallbacks)) {
+        legacyCallbacks.forEach(callback => {
+            try { callback({ register }); } catch (error) { console.error(error); }
+        });
+        try {
+            Object.defineProperty(window.navigator, "wallets", {
+                value:Object.freeze({
+                    push:(...callbacks) => callbacks.forEach(callback => callback({ register }))
+                }),
+                configurable:true
+            });
+        } catch (error) { console.error(error); }
+    }
+    return { get: () => [...wallets] };
+}
+
+const walletRegistry = createWalletRegistry();
+
+async function apiJson(path, options = {}) {
+    const response = await fetch(path, {
+        ...options,
+        headers: { "Content-Type":"application/json", "Accept":"application/json", ...(options.headers || {}) }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || data.error || `Request failed (${response.status})`);
+    return data;
+}
+
+async function connectAndScan(wallet, setStatus) {
+    const connect = wallet?.features?.["standard:connect"]?.connect;
+    const sign = wallet?.features?.["sui:signPersonalMessage"]?.signPersonalMessage;
+    if (!connect || !sign) throw new Error("This wallet does not support the required Sui features.");
+
+    setStatus(`CONNECTING TO ${wallet.name || "SUI WALLET"}...`);
+    const connection = await connect();
+    const accounts = connection?.accounts || wallet.accounts || [];
+    const account = accounts.find(item => String(item.address || "").startsWith("0x"));
+    if (!account) throw new Error("The wallet did not provide a Sui account.");
+
+    connectedWallet = wallet;
+    connectedAccount = account;
+    setStatus("SIGN THE OWNERSHIP CHALLENGE IN YOUR WALLET...");
+    const challenge = await apiJson("/api/gate/nonce", {
+        method:"POST", body:JSON.stringify({ address:account.address })
+    });
+    const signed = await sign({ message:new TextEncoder().encode(challenge.nonce), account });
+    const verified = await apiJson("/api/gate/verify", {
+        method:"POST",
+        body:JSON.stringify({
+            address:account.address,
+            nonce:challenge.nonce,
+            signature:signed.signature,
+            bytes:signed.bytes
+        })
+    });
+    gateAuthToken = verified.token;
+    setStatus("SCANNING DIRECT AND KIOSK HOLDINGS...");
+    return apiJson("/api/gate/scan", {
+        method:"POST",
+        headers:{ Authorization:`Bearer ${gateAuthToken}` },
+        body:"{}"
+    });
 }
 
 /* ===== AUDIO SYSTEM ===== */
@@ -483,6 +632,7 @@ function saveState() {
             history_log: [...history_log],
             finalIdeology: finalIdeology,
             candidateNumber: candidateNumber,
+            selectedNft: selectedNft,
             event: state.event || 0,
             timestamp: Date.now()
         };
@@ -505,28 +655,6 @@ function loadState() {
 function clearSave() {
     localStorage.removeItem(SAVE_KEY);
 }
-
-/* ===== TEST MODE UNLOCK ===== */
-let clickCount = 0;
-const CLICKS_REQUIRED = 7;
-const candidateEl = document.getElementById("candidateId");
-const testBlock = document.getElementById("testModeBlock");
-const testHint = document.getElementById("testHint");
-
-candidateEl.addEventListener("click", () => {
-    if(testBlock.classList.contains("unlocked")) return;
-    clickCount++;
-    if(clickCount < CLICKS_REQUIRED){
-        const remain = CLICKS_REQUIRED - clickCount;
-        testHint.textContent = remain + " more";
-        testHint.classList.add("armed");
-    } else {
-        testBlock.classList.add("unlocked");
-        testHint.textContent = "TEST MODE UNLOCKED";
-        testHint.style.color = "#6bffb8";
-        setTimeout(()=>{ testHint.textContent = ""; }, 2500);
-    }
-});
 
 /* ===== VIDEO ENDING ===== */
 const endingVideos = {
@@ -1150,8 +1278,13 @@ async function render(){
 
     box.innerHTML=`<div class="decision-screen">
         <div class="decision-content" id="decisionContent">
-            <h2>${e.title}</h2>${classHTML}<div id="typed"></div>
-            <div id="choiceList"></div>
+            <div class="case-layout">
+                <div class="case-copy">
+                    <h2>${e.title}</h2>${classHTML}<div id="typed"></div>
+                    <div id="choiceList"></div>
+                </div>
+                ${candidateNftHTML()}
+            </div>
         </div>
         <div class="decision-actions" id="decisionActions">
             <button id="submitBtn" disabled>SUBMIT DECISION</button>
@@ -1172,16 +1305,8 @@ async function render(){
             Math.abs(ch.compassion||0), Math.abs(ch.freedom||0)
         );
         const riskCls = mag>=15 ? 'risk-high' : mag>=8 ? 'risk-mid' : 'risk-low';
-        // Preview the two most significant state changes.
-        const deltas = Object.entries(ch)
-            .filter(([k,v])=>typeof v==='number' && v!==0 && !['finalIdeology'].includes(k))
-            .sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
-            .slice(0,2)
-            .map(([k,v])=>`${k[0].toUpperCase()+k.slice(1)} ${v>0?'+':''}${v}`)
-            .join('  ');
         bh+=`<button class="choice-btn ${riskCls}" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
             <span style="color:#63d8ff; margin-right:8px;">> OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
-            ${deltas?`<small>IMPACT PREVIEW: <span class="delta">${deltas}</span></small>`:''}
         </button>`;
     });
     document.getElementById("choiceList").innerHTML=bh;
@@ -1225,10 +1350,15 @@ function bindChoiceListeners() {
             box.innerHTML = `
                 <div class="decision-screen">
                     <div class="decision-content" id="decisionContent">
-                        <div class="psa">DECISION RECORDED</div>
-                        <div class="fb" id="fb"></div>
-                        <div class="voss-analysis"><pre>${vossAnalysis}</pre></div>
-                        <div id="roWrap"></div>
+                        <div class="case-layout">
+                            <div class="case-copy">
+                                <div class="psa">DECISION RECORDED</div>
+                                <div class="fb" id="fb"></div>
+                                <div class="voss-analysis"><pre>${vossAnalysis}</pre></div>
+                                <div id="roWrap"></div>
+                            </div>
+                            ${candidateNftHTML()}
+                        </div>
                     </div>
                     <div class="decision-actions" id="decisionActions" aria-live="polite"></div>
                 </div>
@@ -1525,111 +1655,124 @@ async function boot(){
     clearFinalEvaluationBackground();
 
     const box=document.getElementById("log");
-
     const savedData = loadState();
-
-    if (savedData) {
-        box.innerHTML = `
-            <pre style="color:#aaa; line-height:1.7;">Unfinished simulation detected.<br><br>
-Last progress: CASE ${savedData.event} / ${events.length}<br>
-Saved at: ${new Date(savedData.timestamp).toLocaleString()}<br><br>
-Continue from last session?</pre>
-            <br>
-            <button id="continueBtn">CONTINUE LAST SIMULATION</button>
-            <button id="newGameBtn">START NEW SIMULATION</button>
-        `;
-
-        document.getElementById("continueBtn").onclick = async () => {
-            const continueBtn = document.getElementById("continueBtn");
-            continueBtn.disabled = true;
-            continueBtn.textContent = "RESTORING CANDIDATE...";
-            try {
-                candidateNumber = Number.isInteger(savedData.candidateNumber)
-                    ? savedData.candidateNumber
-                    : await allocateCandidateNumber();
-            } catch {
-                continueBtn.disabled = false;
-                continueBtn.textContent = "GLOBAL COUNTER OFFLINE — RETRY";
-                return;
-            }
-            state = { ...savedData.state };
-            history_log = savedData.history_log || [];
-            finalIdeology = savedData.finalIdeology || "";
-            submitted = false;
-            pendingChoice = null;
-            pendingLabel = "";
-            selectedChoiceIndex = -1;
-            currentChoices = [];
-            playBeep(720, 60);
-            render();
-        };
-
-        document.getElementById("newGameBtn").onclick = () => {
-            clearSave();
-            candidateNumber = null;
-            boot();
-        };
-        return;
-    }
-
-    // Improved Login-style homepage
     box.innerHTML = `
-        <div style="text-align:center; padding:20px 10px 10px;">
+        <div class="gate-panel">
             <div style="color:#63d8ff; letter-spacing:4px; font-size:13px; margin-bottom:8px;">VOXX INC.</div>
             <h2 style="margin-bottom:6px;">VOSS PROTOCOL</h2>
-            <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:28px;">EXECUTIVE SELECTION SYSTEM</div>
-
-            <div style="margin: 24px 0 8px; padding: 16px 20px; border:1px solid #18232d; background:#090909; text-align:left; max-width:420px; margin-left:auto; margin-right:auto;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span style="color:#888;">CANDIDATE</span>
-                    <span style="color:#e8e8e8; letter-spacing:2px;">#PENDING</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span style="color:#888;">STATUS</span>
-                    <span style="color:#6bffb8;">AWAITING EVALUATION</span>
-                </div>
-                <div style="display:flex; justify-content:space-between;">
-                    <span style="color:#888;">AUTHORIZATION</span>
-                    <span style="color:#d4b35a;">PENDING</span>
-                </div>
-            </div>
-
-            <div style="margin-top:24px;">
-                <button id="beginBtn" style="max-width:420px; margin:0 auto;">BEGIN SIMULATION</button>
-            </div>
-
-            <div style="margin-top:18px; font-size:10px; color:#444; letter-spacing:1px;">
-                YOUR DECISIONS WILL DETERMINE THE FUTURE OF HUMANITY
-            </div>
+            <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:20px;">NFT-RESTRICTED EXECUTIVE SELECTION SYSTEM</div>
+            <div class="gate-status" id="gateStatus">CONNECT A SUI WALLET TO VERIFY VOXX OWNERSHIP.</div>
+            <button id="findWalletsBtn" style="text-align:center;">CONNECT SUI WALLET</button>
+            <div class="wallet-list" id="walletList"></div>
+            <div id="nftSelection"></div>
         </div>
     `;
 
-    // Attach immediately so even a fast click cannot fall through to boot().
-    const beginBtn = document.getElementById("beginBtn");
-    if (beginBtn) {
-        beginBtn.onclick = async (event) => {
-            // This button also sits inside the delegated click area below.
-            // Stop here so the same click cannot call boot() after render().
-            event.stopPropagation();
-            playBeep(850, 80);
-            beginBtn.disabled = true;
-            beginBtn.textContent = "ALLOCATING GLOBAL CANDIDATE...";
-            try {
-                await allocateCandidateNumber();
-            } catch {
-                beginBtn.disabled = false;
-                beginBtn.textContent = "GLOBAL COUNTER OFFLINE — RETRY";
-                return;
-            }
-            clearSave();
-            resetState();
-            render();   // Directly start the first CASE
-        };
-    }
+    const status = document.getElementById("gateStatus");
+    const walletList = document.getElementById("walletList");
+    const selection = document.getElementById("nftSelection");
+    const setStatus = message => { status.textContent = message; };
+
+    const showNfts = scan => {
+        if (!Array.isArray(scan.nfts) || scan.nfts.length === 0) {
+            selection.innerHTML = "";
+            setStatus(scan.scanPartial
+                ? "OWNERSHIP SCAN WAS INCOMPLETE. NO ELIGIBLE NFT WAS VERIFIED. RETRY."
+                : "ACCESS DENIED. THIS WALLET DOES NOT HOLD AN ELIGIBLE VOXX NFT.");
+            return;
+        }
+        setStatus(`OWNERSHIP VERIFIED. SELECT ONE OF ${scan.nfts.length} NFT${scan.nfts.length === 1 ? "" : "S"} AS YOUR CANDIDATE.`);
+        selection.innerHTML = `<div class="nft-selector">${scan.nfts.map((nft, index) => {
+            const image = safeImageUrl(nft.imageUrl);
+            return `<button class="nft-option" data-nft-index="${index}">
+                ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(nft.name)}">` : `<div style="aspect-ratio:1;display:grid;place-items:center;color:#596673;">NO IMAGE</div>`}
+                <span>${escapeHTML(nft.name)}</span>
+                <small>CANDIDATE #${escapeHTML(nft.number)}</small>
+            </button>`;
+        }).join("")}</div><div class="gate-actions" id="gateActions"></div>`;
+
+        selection.querySelectorAll(".nft-option").forEach(button => {
+            button.onclick = () => {
+                selection.querySelectorAll(".nft-option").forEach(item => item.classList.remove("selected"));
+                button.classList.add("selected");
+                selectedNft = scan.nfts[Number(button.dataset.nftIndex)];
+                candidateNumber = selectedNft.number;
+                testShortcutClicks = 0;
+                const canResume = savedData?.selectedNft?.objectId === selectedNft.objectId;
+                document.getElementById("gateActions").innerHTML = `
+                    ${canResume ? `<button id="continueBtn" style="text-align:center;">CONTINUE CASE ${savedData.event}</button>` : ""}
+                    <button id="beginBtn" style="text-align:center;">${canResume ? "START NEW SIMULATION" : "BEGIN SIMULATION"}</button>
+                `;
+                const continueBtn = document.getElementById("continueBtn");
+                if (continueBtn) continueBtn.onclick = () => {
+                    state = { ...savedData.state };
+                    history_log = savedData.history_log || [];
+                    finalIdeology = savedData.finalIdeology || "";
+                    submitted = false;
+                    pendingChoice = null;
+                    pendingLabel = "";
+                    selectedChoiceIndex = -1;
+                    currentChoices = [];
+                    playBeep(720, 60);
+                    render();
+                };
+                document.getElementById("beginBtn").onclick = event => {
+                    event.stopPropagation();
+                    clearSave();
+                    resetState();
+                    playBeep(850, 80);
+                    render();
+                };
+            };
+        });
+    };
+
+    const showWallets = () => {
+        const wallets = walletRegistry.get().filter(wallet =>
+            wallet?.features?.["standard:connect"] && wallet?.features?.["sui:signPersonalMessage"]
+        );
+        if (!wallets.length) {
+            setStatus("NO COMPATIBLE SUI WALLET DETECTED. INSTALL OR UNLOCK A SUI WALLET, THEN RETRY.");
+            walletList.innerHTML = "";
+            return;
+        }
+        setStatus("SELECT A WALLET.");
+        walletList.innerHTML = wallets.map((wallet, index) =>
+            `<button class="wallet-option" data-wallet-index="${index}">${escapeHTML(wallet.name || `SUI WALLET ${index + 1}`)}</button>`
+        ).join("");
+        walletList.querySelectorAll(".wallet-option").forEach(button => {
+            button.onclick = async () => {
+                walletList.querySelectorAll("button").forEach(item => item.disabled = true);
+                selection.innerHTML = "";
+                try {
+                    showNfts(await connectAndScan(wallets[Number(button.dataset.walletIndex)], setStatus));
+                } catch (error) {
+                    setStatus(`VERIFICATION FAILED: ${error.message || "UNKNOWN ERROR"}`);
+                    walletList.querySelectorAll("button").forEach(item => item.disabled = false);
+                }
+            };
+        });
+    };
+
+    document.getElementById("findWalletsBtn").onclick = () => {
+        setStatus("DETECTING SUI WALLETS...");
+        setTimeout(showWallets, 250);
+    };
 }
 
 /* ===== MAIN EVENT LISTENERS ===== */
 document.getElementById("log").addEventListener("click", async e=>{
+    const candidateLabel=e.target.closest(".candidate-nft-label");
+    if(candidateLabel && selectedNft){
+        testShortcutClicks++;
+        if(testShortcutClicks>=7){
+            testShortcutClicks=0;
+            playBeep(1100,90,'sine',0.025);
+            showTestEndingMenu();
+        }
+        return;
+    }
+
     const bb=e.target.closest("#beginBtn");
     if(bb){
         // Only handle the very first BEGIN button (the one in initial HTML).
@@ -1645,44 +1788,6 @@ document.getElementById("log").addEventListener("click", async e=>{
     if(againBtn){
         clearSave();
         location.reload();
-        return;
-    }
-
-    if(!testBlock.classList.contains("unlocked")) return;
-
-    const testA=e.target.closest("#testA");
-    if(testA){
-        resetState();
-        Object.assign(state,{stability:60,transcendence:30,pragmatism:50,control:40,compassion:50,trust:55,event:events.length});
-        finalIdeology="BALANCE";
-        clearSave();
-        render();
-        return;
-    }
-    const testB=e.target.closest("#testB");
-    if(testB){
-        resetState();
-        Object.assign(state,{stability:20,transcendence:5,pragmatism:10,control:10,compassion:80,event:events.length});
-        clearSave();
-        render();
-        return;
-    }
-    const testC=e.target.closest("#testC");
-    if(testC){
-        resetState();
-        Object.assign(state,{stability:80,transcendence:90,pragmatism:80,control:95,compassion:20,trust:70,event:events.length});
-        finalIdeology="PROTECTION";
-        clearSave();
-        render();
-        return;
-    }
-    const testP=e.target.closest("#testP");
-    if(testP){
-        resetState();
-        Object.assign(state,{stability:80,transcendence:70,pragmatism:80,control:55,compassion:80,trust:75,event:events.length});
-        finalIdeology="BALANCE";
-        clearSave();
-        render();
         return;
     }
 

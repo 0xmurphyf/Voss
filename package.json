@@ -10,8 +10,5 @@
     "start": "node server.mjs",
     "dev": "node server.mjs",
     "check": "node --check server.mjs"
-  },
-  "dependencies": {
-    "pg": "^8.16.3"
   }
 }

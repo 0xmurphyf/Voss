@@ -1,6 +1,6 @@
 # VOSS Protocol v2.6
 
-A terminal-style interactive narrative and executive-selection simulation.
+A terminal-style, NFT-gated interactive narrative and executive-selection simulation.
 
 ## Run locally
 
@@ -18,12 +18,13 @@ Connect this repository to a Railway service. Railway detects the Node.js
 application and runs `npm start`. The server listens on Railway's injected
 `PORT` environment variable and serves the game from the repository root.
 
-Add a Railway PostgreSQL service to the same project, then set this application
-service's `DATABASE_URL` variable to:
+The app verifies wallet signatures and reuses the Voxxstake ownership scan,
+including direct holdings and unlisted Kiosk holdings. Set the optional
+`VOXXSTAKE_API_URL` variable when the staking API is not hosted at the default:
 
 ```text
-${{Postgres.DATABASE_URL}}
+https://voxx.up.railway.app/api
 ```
 
-The server creates its counter table automatically. Candidate numbers are
-allocated atomically across all browsers and devices, beginning at `#1500`.
+Only a wallet with a currently owned VOXX NFT may begin. The selected NFT's
+number becomes the candidate number throughout the simulation.
