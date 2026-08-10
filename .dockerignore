@@ -1,0 +1,12 @@
+.git
+.gitignore
+.github
+node_modules
+tests
+test-results
+playwright-report
+.env
+.env.*
+*.log
+.DS_Store
+README.md
