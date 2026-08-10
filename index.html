@@ -1854,9 +1854,28 @@ async function createShareCardImage(outcome, epilogueText) {
     let shareCardUrl = "";
     const shareLinkStatus = modal.querySelector("#shareLinkStatus");
     try {
+        const previewCanvas = document.createElement("canvas");
+        previewCanvas.width = 1200;
+        previewCanvas.height = 630;
+        const previewCtx = previewCanvas.getContext("2d");
+        previewCtx.fillStyle = "#020407";
+        previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+        const previewHeight = 570;
+        const previewWidth = canvas.width * (previewHeight / canvas.height);
+        const previewX = (previewCanvas.width - previewWidth) / 2;
+        const previewY = (previewCanvas.height - previewHeight) / 2;
+        previewCtx.shadowColor = "rgba(0,0,0,0.72)";
+        previewCtx.shadowBlur = 28;
+        previewCtx.drawImage(canvas, previewX, previewY, previewWidth, previewHeight);
+        previewCtx.shadowBlur = 0;
+        previewCtx.strokeStyle = "#263744";
+        previewCtx.strokeRect(previewX, previewY, previewWidth, previewHeight);
         const saved = await apiJson("/api/share-card", {
             method:"POST",
-            body:JSON.stringify({ dataUrl:canvas.toDataURL("image/png") })
+            body:JSON.stringify({
+                dataUrl:canvas.toDataURL("image/png"),
+                previewDataUrl:previewCanvas.toDataURL("image/png")
+            })
         });
         shareCardUrl = new URL(saved.url, window.location.origin).href;
         shareLinkStatus.textContent = "SHARE LINK READY";

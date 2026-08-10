@@ -36,9 +36,11 @@ if (process.env.DATABASE_URL) {
     CREATE TABLE IF NOT EXISTS voss_share_cards (
       id TEXT PRIMARY KEY,
       image BYTEA NOT NULL,
+      preview_image BYTEA,
       content_type TEXT NOT NULL DEFAULT 'image/png',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
+    );
+    ALTER TABLE voss_share_cards ADD COLUMN IF NOT EXISTS preview_image BYTEA
   `);
 }
 const types = {
@@ -308,24 +310,26 @@ createServer(async (req, res) => {
 
     if (raw === "/api/share-card" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
-      const body = await readJsonBody(req, 3 * 1024 * 1024);
+      const body = await readJsonBody(req, 6 * 1024 * 1024);
       const match = String(body.dataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
-      if (!match) {
-        sendJson(res, 400, { detail:"A PNG share card is required" });
+      const previewMatch = String(body.previewDataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+      if (!match || !previewMatch) {
+        sendJson(res, 400, { detail:"PNG share card images are required" });
         return;
       }
       const image = Buffer.from(match[1], "base64");
-      if (!image.length || image.length > 2 * 1024 * 1024) {
+      const previewImage = Buffer.from(previewMatch[1], "base64");
+      if (!image.length || !previewImage.length || image.length > 2 * 1024 * 1024 || previewImage.length > 3 * 1024 * 1024) {
         sendJson(res, 413, { detail:"Share card image is too large" });
         return;
       }
       await attemptsReady;
       const id = randomBytes(12).toString("hex");
       await pool.query(
-        "INSERT INTO voss_share_cards (id, image, content_type) VALUES ($1, $2, 'image/png')",
-        [id, image]
+        "INSERT INTO voss_share_cards (id, image, preview_image, content_type) VALUES ($1, $2, $3, 'image/png')",
+        [id, image, previewImage]
       );
-      sendJson(res, 201, { url:`/share/${id}`, imageUrl:`/share/${id}.png` });
+      sendJson(res, 201, { url:`/share/${id}`, imageUrl:`/share/${id}.png`, previewUrl:`/share/${id}-preview.png` });
       return;
     }
 
@@ -343,6 +347,7 @@ createServer(async (req, res) => {
       const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
       const host = /^[A-Za-z0-9.-]+(?::\d+)?$/.test(forwardedHost) ? forwardedHost : "localhost";
       const imageUrl = `${protocol}://${host}/share/${sharePageMatch[1]}.png`;
+      const previewUrl = `${protocol}://${host}/share/${sharePageMatch[1]}-preview.png`;
       const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>I passed the test</title>
@@ -350,13 +355,13 @@ createServer(async (req, res) => {
 <meta property="og:type" content="website">
 <meta property="og:title" content="I passed the test">
 <meta property="og:description" content="VOSS Protocol Final Evaluation">
-<meta property="og:image" content="${imageUrl}">
-<meta property="og:image:width" content="720">
-<meta property="og:image:height" content="660">
+<meta property="og:image" content="${previewUrl}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="I passed the test">
 <meta name="twitter:description" content="VOSS Protocol Final Evaluation">
-<meta name="twitter:image" content="${imageUrl}">
+<meta name="twitter:image" content="${previewUrl}">
 <style>
 html,body{margin:0;min-height:100%;background:#020407;color:#f2f5f7;font-family:Inter,"Segoe UI",Arial,sans-serif}
 body{display:grid;place-items:center;padding:28px 16px;box-sizing:border-box}
@@ -373,6 +378,28 @@ a:hover{background:#10202a;color:#fff}
         "Cache-Control":"public, max-age=3600"
       });
       res.end(encoded);
+      return;
+    }
+
+    const sharePreviewMatch = raw.match(/^\/share\/([0-9a-f]{24})-preview\.png$/);
+    if (sharePreviewMatch && req.method === "GET") {
+      if (!requireAttemptsDatabase(res)) return;
+      await attemptsReady;
+      const result = await pool.query(
+        "SELECT preview_image, image, content_type FROM voss_share_cards WHERE id=$1",
+        [sharePreviewMatch[1]]
+      );
+      if (!result.rowCount) {
+        sendJson(res, 404, { detail:"Share preview not found" });
+        return;
+      }
+      const image = result.rows[0].preview_image || result.rows[0].image;
+      res.writeHead(200, {
+        "Content-Type":result.rows[0].content_type,
+        "Content-Length":image.length,
+        "Cache-Control":"public, max-age=31536000, immutable"
+      });
+      res.end(image);
       return;
     }
 
