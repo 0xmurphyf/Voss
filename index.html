@@ -1420,13 +1420,12 @@ function buildTimeline(){
     const lines=["HUMANITY EVOLUTION RECORD", SEP2()];
     history_log.forEach((h,i)=>{
         const num=String(i+1).padStart(2,'0');
-        const branch = i===history_log.length-1?"└─":"├─";
         const caseTitle = String(events[i]?.title || "")
             .replace(/<br\s*\/?>/gi," ")
             .replace(/^CASE\s+\d+\s*/i,"")
             .replace(/^THE\s+/i,"")
             .trim();
-        lines.push(`${branch} ${num} · ${caseTitle} · ${h.tag}`);
+        lines.push(`${num} · ${caseTitle} · ${h.tag}`);
     });
     lines.push(SEP2());
     lines.push("VOXX HAS BEEN WATCHING ALL ALONG");
