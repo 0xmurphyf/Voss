@@ -1236,7 +1236,7 @@ function applyChange(changes, label){
     else if(ta>=10) tag="FEAR";
     else if(s>=10) tag="STABILIZE";
     else if(f>=5) tag="PRESERVE";
-    history_log.push({caseTitle:events[state.event].title,choice:label,tag});
+    history_log.push({caseTitle:events[state.event].title,choice:label,tag,changes:{...changes}});
     state.event++;
     saveState();
 }
@@ -1379,6 +1379,25 @@ function buildTimeline(){
     return lines.join("\n");
 }
 
+async function loadServerResultStats() {
+    const data = await apiJson("/api/results/stats");
+    const total = Number(data.total || 0);
+    const counts = data.counts || {};
+    const resultNames = {
+        A:"ACCEPTABLE VOSS CANDIDATE",
+        B:"TOO WEAK FOR HUMANITY",
+        C:"ABSOLUTE VOSS",
+        NEW:"PERFECT VOSS"
+    };
+    const lines = ["SERVER RESULT DISTRIBUTION", SEP2(), `COMPLETED NFTS: ${total}`];
+    Object.entries(resultNames).forEach(([type, name]) => {
+        const count = Number(counts[type] || 0);
+        const percentage = total ? ((count / total) * 100).toFixed(1) : "0.0";
+        lines.push(`${name.padEnd(30,".")} ${String(count).padStart(4," ")}  ${percentage.padStart(5," ")}%`);
+    });
+    return lines.join("\n");
+}
+
 function epilogue(lastTag,type){
     if(type==="NEW"){
         if(lastTag==="PROTECT"||lastTag==="LIBERATE") return "You sought to protect them. In the end, that compassion is exactly why you are perfect.";
@@ -1415,7 +1434,7 @@ async function render(){
             box.innerHTML += `<div id="groupedParams"></div>`;
             document.getElementById("groupedParams").innerHTML = buildGroupedParameters(out.color);
 
-            box.innerHTML += `<div id="endText"></div><div class="timeline ${out.color}" id="tl"></div>`;
+            box.innerHTML += `<div id="endText"></div><div class="timeline ${out.color}" id="tl"></div><div class="timeline" id="serverStats">LOADING SERVER RESULT DISTRIBUTION...</div>`;
             const epi = epilogue(getLastTag(), out.type);
             const compactCore = out.core.split(/<br>/i)
                 .map(line => line.trim())
@@ -1428,6 +1447,12 @@ async function render(){
             await typeHTML(document.getElementById("endText"),
                 `<span class="${out.color} final-sentence">${out.name}</span>${compactCore}<span style="color:#777">${compactEpilogue}</span>`);
             document.getElementById("tl").textContent = buildTimeline();
+            const serverStats = document.getElementById("serverStats");
+            try {
+                serverStats.textContent = await loadServerResultStats();
+            } catch (error) {
+                serverStats.textContent = `SERVER RESULT DISTRIBUTION\n${SEP2()}\nUNAVAILABLE — ${error.message || "RETRY LATER"}`;
+            }
 
             const installFinalActions = () => {
                 const existing = document.getElementById("finalRecordActions");
@@ -1443,6 +1468,9 @@ async function render(){
 
             try {
                 await completeNftAttempt(out);
+                if (!isTestMode) {
+                    try { serverStats.textContent = await loadServerResultStats(); } catch (_) {}
+                }
                 installFinalActions();
             } catch (error) {
                 box.insertAdjacentHTML("beforeend", `<div id="finalRecordActions">

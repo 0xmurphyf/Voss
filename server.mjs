@@ -33,6 +33,16 @@ if (process.env.DATABASE_URL) {
       completed_at TIMESTAMPTZ
     );
     ALTER TABLE voss_nft_attempts ADD COLUMN IF NOT EXISTS image_url TEXT;
+    CREATE TABLE IF NOT EXISTS voss_case_decisions (
+      object_id TEXT NOT NULL REFERENCES voss_nft_attempts(object_id) ON DELETE CASCADE,
+      case_number INTEGER NOT NULL CHECK (case_number BETWEEN 1 AND 12),
+      choice TEXT NOT NULL,
+      decision_tag TEXT NOT NULL,
+      choice_result JSONB NOT NULL DEFAULT '{}'::jsonb,
+      state_result JSONB NOT NULL DEFAULT '{}'::jsonb,
+      recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (object_id, case_number)
+    );
     CREATE TABLE IF NOT EXISTS voss_share_cards (
       id TEXT PRIMARY KEY,
       image BYTEA NOT NULL,
@@ -445,7 +455,46 @@ a:hover{background:#10202a;color:#fff}
         sendJson(res, 403, { detail:"Active NFT attempt not found" });
         return;
       }
+      const progress = body.progress && typeof body.progress === "object" ? body.progress : {};
+      const history = Array.isArray(progress.history) ? progress.history : [];
+      const decision = completedCases > 0 ? history[completedCases - 1] : null;
+      if (decision) {
+        await pool.query(
+          `INSERT INTO voss_case_decisions
+             (object_id, case_number, choice, decision_tag, choice_result, state_result)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
+           ON CONFLICT (object_id, case_number) DO UPDATE SET
+             choice=EXCLUDED.choice,
+             decision_tag=EXCLUDED.decision_tag,
+             choice_result=EXCLUDED.choice_result,
+             state_result=EXCLUDED.state_result,
+             recorded_at=NOW()`,
+          [
+            body.objectId,
+            completedCases,
+            String(decision.choice || "UNKNOWN").slice(0, 1000),
+            String(decision.tag || "NEUTRAL").slice(0, 80),
+            JSON.stringify(decision.changes || {}),
+            JSON.stringify(progress.state || {})
+          ]
+        );
+      }
       sendJson(res, 200, { completedCases:Number(updated.rows[0].completed_cases) });
+      return;
+    }
+
+    if (raw === "/api/results/stats" && req.method === "GET") {
+      if (!requireAttemptsDatabase(res)) return;
+      await attemptsReady;
+      const result = await pool.query(
+        `SELECT COALESCE(final_outcome->>'type','UNKNOWN') AS type, COUNT(*)::int AS count
+         FROM voss_nft_attempts
+         WHERE status='completed'
+         GROUP BY COALESCE(final_outcome->>'type','UNKNOWN')`
+      );
+      const counts = Object.fromEntries(result.rows.map((row) => [row.type, Number(row.count)]));
+      const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+      sendJson(res, 200, { total, counts });
       return;
     }
 
