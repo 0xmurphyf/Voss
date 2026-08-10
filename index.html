@@ -370,6 +370,22 @@ input:focus-visible {
     object-fit:cover;
     pointer-events:none;
 }
+#candidateSimulationBackground {
+    position:fixed;
+    inset:0;
+    z-index:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    opacity:0.3;
+    filter:saturate(0.8) contrast(1.08);
+    pointer-events:none;
+}
+body.simulation-nft #terminal {
+    z-index:1;
+    background:rgba(7,11,16,0.76);
+    backdrop-filter:blur(2px);
+}
 body.final-evaluation {
     height:100%;
     min-height:0;
@@ -831,20 +847,33 @@ function clearFinalEvaluationBackground() {
     document.getElementById("finalEvaluationBackground")?.remove();
 }
 
-function setFinalEvaluationBackground(outcomeOrType) {
-    clearFinalEvaluationBackground();
-    const nftImageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
+function clearCandidateSimulationBackground() {
+    document.getElementById("candidateSimulationBackground")?.remove();
+    document.body.classList.remove("simulation-nft");
+}
+
+function setCandidateSimulationBackground() {
+    const imageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
         ? `/api/nft-image/${selectedNft.objectId}`
         : safeImageUrl(selectedNft?.imageUrl);
-    if (nftImageUrl) {
-        const image = document.createElement("img");
-        image.id = "finalEvaluationBackground";
-        image.src = nftImageUrl;
+    if (!imageUrl) {
+        clearCandidateSimulationBackground();
+        return;
+    }
+    let image = document.getElementById("candidateSimulationBackground");
+    if (!image) {
+        image = document.createElement("img");
+        image.id = "candidateSimulationBackground";
         image.alt = "";
         image.setAttribute("aria-hidden", "true");
         document.body.prepend(image);
-        return;
     }
+    if (image.src !== new URL(imageUrl, window.location.href).href) image.src = imageUrl;
+    document.body.classList.add("simulation-nft");
+}
+
+function setFinalEvaluationBackground(outcomeOrType) {
+    clearFinalEvaluationBackground();
     const type = getEndingAssetType(outcomeOrType);
     const video = document.createElement("video");
     video.id = "finalEvaluationBackground";
@@ -1392,6 +1421,8 @@ async function render(){
     const box=document.getElementById("log");
     const isFinalEvaluation = state.event >= events.length;
     document.body.classList.toggle("final-evaluation", isFinalEvaluation);
+    if (isFinalEvaluation) clearCandidateSimulationBackground();
+    else setCandidateSimulationBackground();
     if(state.event>=events.length){
         const out = evaluateCandidate();
         let animType = out.type==="NEW"?"P":out.type;
@@ -1940,6 +1971,7 @@ async function boot(){
     resetState();
     document.body.classList.remove("final-evaluation");
     clearFinalEvaluationBackground();
+    clearCandidateSimulationBackground();
 
     const box=document.getElementById("log");
     box.innerHTML = `
