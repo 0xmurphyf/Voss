@@ -325,7 +325,47 @@ createServer(async (req, res) => {
         "INSERT INTO voss_share_cards (id, image, content_type) VALUES ($1, $2, 'image/png')",
         [id, image]
       );
-      sendJson(res, 201, { url:`/share/${id}.png` });
+      sendJson(res, 201, { url:`/share/${id}`, imageUrl:`/share/${id}.png` });
+      return;
+    }
+
+    const sharePageMatch = raw.match(/^\/share\/([0-9a-f]{24})$/);
+    if (sharePageMatch && req.method === "GET") {
+      if (!requireAttemptsDatabase(res)) return;
+      await attemptsReady;
+      const exists = await pool.query("SELECT 1 FROM voss_share_cards WHERE id=$1", [sharePageMatch[1]]);
+      if (!exists.rowCount) {
+        sendJson(res, 404, { detail:"Share card not found" });
+        return;
+      }
+      const forwardedProto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+      const protocol = forwardedProto === "http" ? "http" : "https";
+      const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+      const host = /^[A-Za-z0-9.-]+(?::\d+)?$/.test(forwardedHost) ? forwardedHost : "localhost";
+      const imageUrl = `${protocol}://${host}/share/${sharePageMatch[1]}.png`;
+      const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>I passed the test</title>
+<meta name="description" content="VOSS Protocol Final Evaluation">
+<meta property="og:type" content="website">
+<meta property="og:title" content="I passed the test">
+<meta property="og:description" content="VOSS Protocol Final Evaluation">
+<meta property="og:image" content="${imageUrl}">
+<meta property="og:image:width" content="720">
+<meta property="og:image:height" content="660">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="I passed the test">
+<meta name="twitter:description" content="VOSS Protocol Final Evaluation">
+<meta name="twitter:image" content="${imageUrl}">
+<style>html,body{margin:0;min-height:100%;background:#020407;display:grid;place-items:center}img{display:block;width:min(720px,100%);height:auto}</style>
+</head><body><img src="${imageUrl}" alt="VOSS Protocol Final Evaluation"></body></html>`;
+      const encoded = Buffer.from(html);
+      res.writeHead(200, {
+        "Content-Type":"text/html; charset=utf-8",
+        "Content-Length":encoded.length,
+        "Cache-Control":"public, max-age=3600"
+      });
+      res.end(encoded);
       return;
     }
 

@@ -346,7 +346,7 @@ button.choice-btn small {
 #groupedParams, #endText { text-align:left; }
 #endText .final-sentence {
     display:block;
-    margin:0 0 6px;
+    margin:0 0 1em;
 }
 .param-row span:first-child { color:#cbd2d8; }
 .param-row span:last-child { color:#fff; font-weight:700; letter-spacing:1px; }
@@ -1307,7 +1307,7 @@ function buildEvaluationScreen(){
     else lines.push("CONCLUSION: REGRESSION. UNFIT FOR INHERITANCE.");
     lines.push("> "+out.name.replace("ENDING ","").replace("NEW ENDING","NEW ENDING"));
 
-    return {screen:lines.join("\n"), outcome:out};
+    return {screen:lines.join("\n\n"), outcome:out};
 }
 
 /* ===== Grouped Parameters for Final Evaluation ===== */
@@ -1789,7 +1789,7 @@ async function createShareCardImage(outcome, epilogueText) {
     coreLines.forEach(line => {
         if (line.trim()) {
             ctx.fillText(line.trim(), 44, y, 450);
-            y += 29;
+            y += 38;
         }
     });
 
@@ -1801,7 +1801,7 @@ async function createShareCardImage(outcome, epilogueText) {
     epiLines.forEach((line, i) => {
         if (i < 3 && line.trim()) {
             ctx.fillText(line.trim() + (i < epiLines.length-1 ? "." : ""), 44, y);
-            y += 27;
+            y += 36;
         }
     });
 
