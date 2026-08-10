@@ -1449,6 +1449,7 @@ async function loadServerResultStats() {
     if (total < 20) lines.push("EARLY DATA — SMALL SAMPLE");
     Object.entries(resultNames).forEach(([type, name]) => {
         const count = Number(counts[type] || 0);
+        if (type === "NEW" && count === 0) return;
         const percentage = total ? ((count / total) * 100).toFixed(1) : "0.0";
         lines.push(`${name.padEnd(30,".")} ${String(count).padStart(4," ")}  ${percentage.padStart(5," ")}%`);
     });
