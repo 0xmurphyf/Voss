@@ -35,6 +35,8 @@ body {
 #terminal::before {
     content:"// SECURE NODE  |  v2.6";
     position:absolute; top:8px; right:14px;
+    z-index:20;
+    pointer-events:none;
     font-size: clamp(10px, 0.85vw, 12px); color:#aeb7c0; letter-spacing:1px;
 }
 h1 {
@@ -768,7 +770,11 @@ async function connectAndScan(wallet, setStatus) {
     connectedAccount = account;
     setStatus("ENTERING EXECUTIVE SELECTION SYSTEM");
     const challenge = await apiJson("/api/gate/nonce", {
-        method:"POST", body:JSON.stringify({ address:account.address })
+        method:"POST",
+        body:JSON.stringify({
+            address:account.address,
+            purpose:"voss-executive-selection"
+        })
     });
     const signed = await sign({ message:new TextEncoder().encode(challenge.nonce), account });
     const verified = await apiJson("/api/gate/verify", {
