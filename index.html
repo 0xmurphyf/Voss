@@ -766,7 +766,7 @@ async function connectAndScan(wallet, setStatus) {
 
     connectedWallet = wallet;
     connectedAccount = account;
-    setStatus("SIGN THE OWNERSHIP CHALLENGE IN YOUR WALLET...");
+    setStatus("ENTERING EXECUTIVE SELECTION SYSTEM");
     const challenge = await apiJson("/api/gate/nonce", {
         method:"POST", body:JSON.stringify({ address:account.address })
     });
@@ -1397,7 +1397,7 @@ function buildTimeline(){
             .replace(/^CASE\s+\d+\s*/i,"")
             .replace(/^THE\s+/i,"")
             .trim();
-        lines.push(`${branch} CASE ${num} · ${caseTitle} · ${h.tag}`);
+        lines.push(`${branch} ${num} · ${caseTitle} · ${h.tag}`);
     });
     lines.push(SEP2());
     lines.push("VOXX HAS BEEN WATCHING ALL ALONG");
