@@ -661,11 +661,12 @@ a:hover{background:#10202a;color:#fff}
       const counts = Object.fromEntries(result.rows.map((row) => [row.type, Number(row.count)]));
       const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
       const case12Result = await pool.query(
-        `SELECT split_part(d.choice, '<br>', 1) AS choice, COUNT(*)::int AS count
+        `SELECT trim(split_part(split_part(d.choice, '<br>', 1), '“', 1)) AS choice,
+                COUNT(*)::int AS count
          FROM voss_case_decisions d
          INNER JOIN voss_nft_attempts a ON a.object_id=d.object_id
          WHERE d.case_number=12 AND a.status='completed'
-         GROUP BY split_part(d.choice, '<br>', 1)
+         GROUP BY trim(split_part(split_part(d.choice, '<br>', 1), '“', 1))
          ORDER BY count DESC, choice ASC`
       );
       const case12Options = case12Result.rows.map((row) => ({

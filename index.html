@@ -1254,15 +1254,15 @@ text:()=>{
 },
 question:"“What does humanity need?”",
 choices:[
-["Continue VOXX",
+["Continue VOXX<br><small>“Humanity needs protection.”</small>",
  {stability:3, transcendence:3, threat_awareness:3, finalIdeology:"PROTECTION"}],
-["Preserve Humanity",
+["Preserve Humanity<br><small>“Humanity needs freedom.”</small>",
  {freedom:3, trust:3, stability:-3, finalIdeology:"LIBERTY"}],
-["Reform VOXX",
+["Reform VOXX<br><small>“Humanity needs balance.”</small>",
  {stability:2, freedom:2, trust:2, transcendence:2, finalIdeology:"BALANCE"}],
-["Accept Total Evolution",
+["Accept Total Evolution<br><small>“Humanity must become something new.”</small>",
  {transcendence:5, evolution:5, finalIdeology:"TRANSCENDENCE"}],
-["Reject The Burden",
+["Reject The Burden<br><small>“No one should decide humanity’s future.”</small>",
  {freedom:3, stability:-5, finalIdeology:"ABNEGATION"}]
 ]
 }
@@ -1589,9 +1589,7 @@ async function render(){
     selectedChoiceIndex = -1;
 
     e.choices.forEach((c, idx) => {
-        const plain = state.event === 11
-            ? c[0].split(/<br\s*\/?\s*>/i)[0].trim()
-            : c[0].replace(/<[^>]+>/g,' ').trim();
+        const plain=c[0].replace(/<[^>]+>/g,' ').trim();
         bh+=`<button class="choice-btn" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
             <span class="choice-index">&gt; OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
         </button>`;
