@@ -196,6 +196,20 @@ button.choice-btn small {
     border:1px solid #18232d;
 }
 .candidate-nft-label { margin-top:9px; color:#63d8ff; font-size:11px; letter-spacing:1.5px; cursor:pointer; user-select:none; }
+.case-layout.decision-recorded-layout {
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) minmax(190px, 260px);
+    gap:clamp(18px, 3vw, 42px);
+    align-items:start;
+    min-height:0;
+}
+.decision-recorded-layout .candidate-nft {
+    position:sticky;
+    top:4px;
+    right:auto;
+    width:auto;
+    opacity:1;
+}
 .gate-panel { max-width:760px; margin:0 auto; text-align:center; padding:14px 4px; }
 .gate-status { margin:18px 0; padding:12px; border:1px solid #263744; background:#080c11; color:#c1c8cf; line-height:1.55; }
 .wallet-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:14px 0; }
@@ -478,6 +492,10 @@ body.final-evaluation #log {
     .case-layout { display:block; min-height:190px; }
     .candidate-nft { position:absolute; top:0; right:0; width:min(54%, 220px); display:block; text-align:center; opacity:0.28; }
     .candidate-nft img { width:100%; }
+    .case-layout.decision-recorded-layout { display:flex; flex-direction:column; gap:12px; min-height:0; }
+    .decision-recorded-layout .candidate-nft { order:-1; position:static; width:100%; display:grid; grid-template-columns:82px 1fr; gap:10px; text-align:left; align-items:center; opacity:1; }
+    .decision-recorded-layout .candidate-nft img { width:82px; }
+    .decision-recorded-layout .candidate-nft-label { margin-top:0; }
     .wallet-list, .nft-selector { grid-template-columns:1fr 1fr; }
     #nftSelection { display:flex; flex-direction:column; }
     #nftSelection .gate-actions { order:-1; margin:8px 0 14px; }
@@ -1522,7 +1540,7 @@ function bindChoiceListeners() {
             box.innerHTML = `
                 <div class="decision-screen">
                     <div class="decision-content" id="decisionContent">
-                        <div class="case-layout">
+                        <div class="case-layout decision-recorded-layout">
                             <div class="case-copy">
                                 <div class="psa">DECISION RECORDED</div>
                                 <div class="fb" id="fb"></div>
@@ -1829,13 +1847,22 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.font = "12.5px 'Space Mono', monospace";
     const s = state;
     const metrics = [
-        `STABILITY      ${s.stability}     COMPASSION     ${s.compassion}`,
-        `FREEDOM        ${s.freedom}     CONTROL        ${s.control}`,
-        `TRANSCENDENCE  ${s.transcendence}     PRAGMATISM     ${s.pragmatism}`
+        ["STABILITY", s.stability, "COMPASSION", s.compassion],
+        ["FREEDOM", s.freedom, "CONTROL", s.control],
+        ["TRANSCENDENCE", s.transcendence, "PRAGMATISM", s.pragmatism]
     ];
-    metrics.forEach((m, i) => {
-        ctx.fillText(m, 44, y + 72 + i * 20);
+    metrics.forEach(([leftLabel, leftValue, rightLabel, rightValue], i) => {
+        const rowY = y + 72 + i * 20;
+        ctx.textAlign = "left";
+        ctx.fillText(leftLabel, 44, rowY);
+        ctx.textAlign = "right";
+        ctx.fillText(String(leftValue), 230, rowY);
+        ctx.textAlign = "left";
+        ctx.fillText(rightLabel, 280, rowY);
+        ctx.textAlign = "right";
+        ctx.fillText(String(rightValue), 450, rowY);
     });
+    ctx.textAlign = "left";
 
     // Footer
     ctx.fillStyle = "#81909e";
