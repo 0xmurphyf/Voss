@@ -1589,7 +1589,9 @@ async function render(){
     selectedChoiceIndex = -1;
 
     e.choices.forEach((c, idx) => {
-        const plain=c[0].replace(/<[^>]+>/g,' ').trim();
+        const plain = state.event === 11
+            ? c[0].split(/<br\s*\/?\s*>/i)[0].trim()
+            : c[0].replace(/<[^>]+>/g,' ').trim();
         bh+=`<button class="choice-btn" data-index="${idx}" data-choice='${JSON.stringify(c[1])}' data-label="${plain}">
             <span class="choice-index">&gt; OPTION ${String(idx+1).padStart(2,'0')}</span>${c[0]}
         </button>`;
