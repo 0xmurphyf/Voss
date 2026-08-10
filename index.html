@@ -489,16 +489,7 @@ body.final-evaluation #log {
 </head>
 <body>
 <div id="terminal">
-<div id="log">
-VOXX INC.<br><br>
-VOSS PROTOCOL<br><br>
-EXECUTIVE SELECTION SYSTEM<br><br>
-<span id="candidateId" style="cursor:pointer; color:#aaa; letter-spacing:2px;">candidate</span><br><br>
-You are being evaluated.<br><br>
-Failure is unacceptable.
-<br><br>
-<button id="beginBtn">BEGIN SIMULATION</button>
-</div>
+<div id="log"></div>
 <button class="reset-btn" id="resetBtn">RESTART</button>
 </div>
 
@@ -1924,6 +1915,7 @@ async function boot(){
             <div style="color:#63d8ff; letter-spacing:4px; font-size:13px; margin-bottom:8px;">VOXX INC.</div>
             <h2 id="preWalletShortcut" style="margin-bottom:6px;cursor:default;user-select:none;">VOSS PROTOCOL</h2>
             <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:20px;">NFT-RESTRICTED EXECUTIVE SELECTION SYSTEM</div>
+            <div class="psa" id="homePsa" aria-live="polite"></div>
             <div class="gate-status" id="gateStatus">CONNECT A SUI WALLET TO VERIFY VOXX OWNERSHIP.</div>
             <button id="findWalletsBtn" style="text-align:center;">CONNECT SUI WALLET</button>
             <div class="wallet-list" id="walletList"></div>
@@ -2044,6 +2036,12 @@ async function boot(){
         setStatus("DETECTING SUI WALLETS...");
         setTimeout(showWallets, 250);
     };
+
+    void typeHTML(
+        document.getElementById("homePsa"),
+        "YOU ARE BEING EVALUATED. FAILURE IS UNACCEPTABLE.",
+        28
+    );
 }
 
 /* ===== MAIN EVENT LISTENERS ===== */
