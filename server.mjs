@@ -8,6 +8,7 @@ import { isIP } from "node:net";
 const root = process.cwd();
 const port = Number.parseInt(process.env.PORT || "4173", 10);
 const voxxstakeApi = (process.env.VOXXSTAKE_API_URL || "https://voxx.up.railway.app/api").replace(/\/$/, "");
+const publicOrigin = (process.env.PUBLIC_ORIGIN || "https://voss.voxxinc.xyz").replace(/\/$/, "");
 const rateBuckets = new Map();
 let pool = null;
 let attemptsReady = Promise.resolve();
@@ -493,7 +494,11 @@ createServer(async (req, res) => {
         "INSERT INTO voss_share_cards (id, object_id, image, preview_image, content_type) VALUES ($1, $2, $3, $4, 'image/png')",
         [id, objectId, image, previewImage]
       );
-      sendJson(res, 201, { url:`/share/${id}`, imageUrl:`/share/${id}.png`, previewUrl:`/share/${id}-preview.png` });
+      sendJson(res, 201, {
+        url:`${publicOrigin}/share/${id}`,
+        imageUrl:`${publicOrigin}/share/${id}.png`,
+        previewUrl:`${publicOrigin}/share/${id}-preview.png`
+      });
       return;
     }
 
@@ -506,12 +511,8 @@ createServer(async (req, res) => {
         sendJson(res, 404, { detail:"Share card not found" });
         return;
       }
-      const forwardedProto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
-      const protocol = forwardedProto === "http" ? "http" : "https";
-      const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
-      const host = /^[A-Za-z0-9.-]+(?::\d+)?$/.test(forwardedHost) ? forwardedHost : "localhost";
-      const imageUrl = `${protocol}://${host}/share/${sharePageMatch[1]}.png`;
-      const previewUrl = `${protocol}://${host}/share/${sharePageMatch[1]}-preview.png`;
+      const imageUrl = `${publicOrigin}/share/${sharePageMatch[1]}.png`;
+      const previewUrl = `${publicOrigin}/share/${sharePageMatch[1]}-preview.png`;
       const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TEST RESULT</title>
@@ -534,7 +535,7 @@ img{display:block;width:min(720px,100%);height:auto;border:1px solid #263744;box
 a{display:inline-block;padding:12px 24px;border:1px solid #63d8ff;color:#63d8ff;background:#070b10;text-decoration:none;letter-spacing:2px;font-size:13px}
 a:hover{background:#10202a;color:#fff}
 </style>
-</head><body><main><img src="${imageUrl}" alt="VOSS Protocol Final Evaluation"><a href="https://voss.up.railway.app">JOIN THE TEST</a></main></body></html>`;
+</head><body><main><img src="${imageUrl}" alt="VOSS Protocol Final Evaluation"><a href="${publicOrigin}">JOIN THE TEST</a></main></body></html>`;
       const encoded = Buffer.from(html);
       res.writeHead(200, {
         "Content-Type":"text/html; charset=utf-8",
