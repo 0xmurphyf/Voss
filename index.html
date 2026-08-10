@@ -1323,7 +1323,9 @@ function generateVossAnalysis(changes) {
     return `VOSS ANALYSIS
 
 Human factor:     ${humanFactor}
+
 System risk:      ${systemRisk}
+
 Prediction:       ${longTerm}`;
 }
 
@@ -1414,6 +1416,7 @@ async function loadServerResultStats() {
     const data = await apiJson("/api/results/stats");
     const total = Number(data.total || 0);
     const counts = data.counts || {};
+    const case12 = data.case12 || {};
     const resultNames = {
         A:"ACCEPTABLE VOSS CANDIDATE",
         B:"TOO WEAK FOR HUMANITY",
@@ -1427,6 +1430,16 @@ async function loadServerResultStats() {
         const percentage = total ? ((count / total) * 100).toFixed(1) : "0.0";
         lines.push(`${name.padEnd(30,".")} ${String(count).padStart(4," ")}  ${percentage.padStart(5," ")}%`);
     });
+    const case12Total = Number(case12.total || 0);
+    lines.push("", "CASE 12 OPTION DISTRIBUTION", SEP2(), `RECORDED DECISIONS: ${case12Total}`);
+    if (case12Total < 20) lines.push("EARLY DATA — SMALL SAMPLE");
+    (Array.isArray(case12.options) ? case12.options : []).forEach(option => {
+        const label = String(option.choice || "UNKNOWN").toUpperCase();
+        const count = Number(option.count || 0);
+        const percentage = case12Total ? ((count / case12Total) * 100).toFixed(1) : "0.0";
+        lines.push(`${label.padEnd(30,".")} ${String(count).padStart(4," ")}  ${percentage.padStart(5," ")}%`);
+    });
+    if (!case12Total) lines.push("NO COMPLETED CASE 12 DECISIONS YET");
     return lines.join("\n");
 }
 

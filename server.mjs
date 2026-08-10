@@ -659,7 +659,24 @@ a:hover{background:#10202a;color:#fff}
       );
       const counts = Object.fromEntries(result.rows.map((row) => [row.type, Number(row.count)]));
       const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
-      sendJson(res, 200, { total, counts });
+      const case12Result = await pool.query(
+        `SELECT split_part(d.choice, '<br>', 1) AS choice, COUNT(*)::int AS count
+         FROM voss_case_decisions d
+         INNER JOIN voss_nft_attempts a ON a.object_id=d.object_id
+         WHERE d.case_number=12 AND a.status='completed'
+         GROUP BY split_part(d.choice, '<br>', 1)
+         ORDER BY count DESC, choice ASC`
+      );
+      const case12Options = case12Result.rows.map((row) => ({
+        choice:String(row.choice || "UNKNOWN"),
+        count:Number(row.count)
+      }));
+      const case12Total = case12Options.reduce((sum, option) => sum + option.count, 0);
+      sendJson(res, 200, {
+        total,
+        counts,
+        case12:{ total:case12Total, options:case12Options }
+      });
       return;
     }
 

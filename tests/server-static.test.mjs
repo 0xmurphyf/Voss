@@ -12,6 +12,8 @@ test("security-critical server controls remain present", () => {
   assert.match(server, /voss_verified_scans/);
   assert.match(server, /BEGIN/);
   assert.match(server, /ROLLBACK/);
+  assert.match(server, /d\.case_number=12/);
+  assert.match(server, /case12:\{ total:case12Total, options:case12Options \}/);
 });
 
 test("retention and privacy disclosures stay aligned", () => {
@@ -24,5 +26,6 @@ test("critical UI controls are present", () => {
   assert.match(page, /DISCONNECT WALLET/);
   assert.match(page, /SUBMIT DECISION/);
   assert.match(page, /SERVER RESULT DISTRIBUTION/);
+  assert.match(page, /CASE 12 OPTION DISTRIBUTION/);
   assert.match(page, /GENERATE SHARE CARD/);
 });
