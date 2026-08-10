@@ -210,6 +210,8 @@ button.choice-btn small {
     width:auto;
     opacity:1;
 }
+.decision-recorded-readout { width:100%; }
+.decision-recorded-readout .stats { width:100%; }
 .gate-panel { max-width:760px; margin:0 auto; text-align:center; padding:14px 4px; }
 .gate-status { margin:18px 0; padding:12px; border:1px solid #263744; background:#080c11; color:#c1c8cf; line-height:1.55; }
 .wallet-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:14px 0; }
@@ -1573,10 +1575,10 @@ function bindChoiceListeners() {
                                 <div class="psa">DECISION RECORDED</div>
                                 <div class="fb" id="fb"></div>
                                 <div class="voss-analysis"><pre>${vossAnalysis}</pre></div>
-                                <div id="roWrap"></div>
                             </div>
                             ${candidateNftHTML()}
                         </div>
+                        <div id="roWrap" class="decision-recorded-readout"></div>
                     </div>
                     <div class="decision-actions" id="decisionActions" aria-live="polite"></div>
                 </div>
