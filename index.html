@@ -169,15 +169,19 @@ button.choice-btn small {
     z-index:5;
 }
 .case-layout {
-    display:grid;
-    grid-template-columns:minmax(0, 1fr) minmax(190px, 260px);
-    gap:clamp(18px, 3vw, 42px);
-    align-items:start;
+    position:relative;
+    display:block;
+    min-height:clamp(210px, 24vw, 290px);
 }
-.case-copy { min-width:0; }
+.case-copy { position:relative; z-index:1; min-width:0; }
 .candidate-nft {
-    position:sticky;
+    position:absolute;
+    z-index:0;
     top:4px;
+    right:0;
+    width:min(42%, 290px);
+    opacity:0.3;
+    pointer-events:none;
     border:1px solid #263744;
     background:#080c11;
     padding:10px;
@@ -370,22 +374,6 @@ input:focus-visible {
     object-fit:cover;
     pointer-events:none;
 }
-#candidateSimulationBackground {
-    position:fixed;
-    inset:0;
-    z-index:0;
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    opacity:0.3;
-    filter:saturate(0.8) contrast(1.08);
-    pointer-events:none;
-}
-body.simulation-nft #terminal {
-    z-index:1;
-    background:rgba(7,11,16,0.76);
-    backdrop-filter:blur(2px);
-}
 body.final-evaluation {
     height:100%;
     min-height:0;
@@ -487,10 +475,9 @@ body.final-evaluation #log {
     button, .choice-btn { font-size:14px; padding:13px 10px; min-height:46px; }
     button.choice-btn { padding:13px 10px 13px 18px; min-height:46px; line-height:1.35; }
     .decision-actions { min-height:60px; padding-top:7px; }
-    .case-layout { display:flex; flex-direction:column; gap:12px; }
-    .candidate-nft { order:-1; position:static; width:100%; display:grid; grid-template-columns:82px 1fr; gap:10px; text-align:left; align-items:center; }
-    .candidate-nft img { width:82px; }
-    .candidate-nft-label { margin-top:0; }
+    .case-layout { display:block; min-height:190px; }
+    .candidate-nft { position:absolute; top:0; right:0; width:min(54%, 220px); display:block; text-align:center; opacity:0.28; }
+    .candidate-nft img { width:100%; }
     .wallet-list, .nft-selector { grid-template-columns:1fr 1fr; }
     #nftSelection { display:flex; flex-direction:column; }
     #nftSelection .gate-actions { order:-1; margin:8px 0 14px; }
@@ -845,31 +832,6 @@ function getEndingAssetType(outcomeOrType) {
 
 function clearFinalEvaluationBackground() {
     document.getElementById("finalEvaluationBackground")?.remove();
-}
-
-function clearCandidateSimulationBackground() {
-    document.getElementById("candidateSimulationBackground")?.remove();
-    document.body.classList.remove("simulation-nft");
-}
-
-function setCandidateSimulationBackground() {
-    const imageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
-        ? `/api/nft-image/${selectedNft.objectId}`
-        : safeImageUrl(selectedNft?.imageUrl);
-    if (!imageUrl) {
-        clearCandidateSimulationBackground();
-        return;
-    }
-    let image = document.getElementById("candidateSimulationBackground");
-    if (!image) {
-        image = document.createElement("img");
-        image.id = "candidateSimulationBackground";
-        image.alt = "";
-        image.setAttribute("aria-hidden", "true");
-        document.body.prepend(image);
-    }
-    if (image.src !== new URL(imageUrl, window.location.href).href) image.src = imageUrl;
-    document.body.classList.add("simulation-nft");
 }
 
 function setFinalEvaluationBackground(outcomeOrType) {
@@ -1421,8 +1383,6 @@ async function render(){
     const box=document.getElementById("log");
     const isFinalEvaluation = state.event >= events.length;
     document.body.classList.toggle("final-evaluation", isFinalEvaluation);
-    if (isFinalEvaluation) clearCandidateSimulationBackground();
-    else setCandidateSimulationBackground();
     if(state.event>=events.length){
         const out = evaluateCandidate();
         let animType = out.type==="NEW"?"P":out.type;
@@ -1804,13 +1764,13 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.lineTo(cardWidth - 44, 115);
     ctx.stroke();
 
-    // Selected candidate NFT, 50% larger than the previous 146px card image.
+    // Selected candidate NFT at its original display size, rendered at 2x output resolution.
     if (nftImageUrl) {
         try {
             const nftImage = await loadCanvasImage(nftImageUrl);
-            const nftX = 453;
+            const nftX = 526;
             const nftY = 132;
-            const nftSize = 219;
+            const nftSize = 146;
             drawImageCoverRect(ctx, nftImage, nftX, nftY, nftSize, nftSize);
             ctx.strokeStyle = "#596673";
             ctx.lineWidth = 1;
@@ -1971,7 +1931,6 @@ async function boot(){
     resetState();
     document.body.classList.remove("final-evaluation");
     clearFinalEvaluationBackground();
-    clearCandidateSimulationBackground();
 
     const box=document.getElementById("log");
     box.innerHTML = `
