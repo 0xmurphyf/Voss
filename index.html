@@ -1860,7 +1860,7 @@ async function createShareCardImage(outcome, epilogueText) {
         previewCtx.fillStyle = "#020407";
         previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
         const previewCropHeight = Math.min(canvas.height, y + 130);
-        const previewScale = 1;
+        const previewScale = 1.5;
         const previewWidth = canvas.width * previewScale;
         const previewHeight = previewCropHeight * previewScale;
         const previewX = (previewCanvas.width - previewWidth) / 2;
