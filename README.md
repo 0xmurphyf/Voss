@@ -37,3 +37,23 @@ that NFT's single attempt, and unfinished attempts can continue after a fresh
 ownership scan. Progress is recorded after every case. The NFT is permanently
 marked completed only after the full Final Evaluation is displayed. The
 selected NFT's number becomes the candidate number throughout the simulation.
+
+## Data retention and safeguards
+
+VOSS stores each NFT's case choices, parameter changes, progress and final
+result. Published share-card images expire after 30 days, and wallet addresses
+are removed from completed records after 90 days. Share publishing requires a
+completed attempt token and is limited by IP and NFT. Ownership scan tokens are
+stored in PostgreSQL so deploys and multiple Railway instances do not invalidate
+an active five-minute scan.
+
+## Test
+
+```bash
+npm run check
+npx playwright install chromium
+npm run test:e2e
+```
+
+GitHub Actions runs the syntax, security-contract and Chromium UI smoke tests on
+every push and pull request.

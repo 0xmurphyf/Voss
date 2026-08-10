@@ -1415,6 +1415,7 @@ async function loadServerResultStats() {
         NEW:"PERFECT VOSS"
     };
     const lines = ["SERVER RESULT DISTRIBUTION", SEP2(), `COMPLETED NFTS: ${total}`];
+    if (total < 20) lines.push("EARLY DATA — SMALL SAMPLE");
     Object.entries(resultNames).forEach(([type, name]) => {
         const count = Number(counts[type] || 0);
         const percentage = total ? ((count / total) * 100).toFixed(1) : "0.0";
@@ -1967,6 +1968,10 @@ async function createShareCardImage(outcome, epilogueText) {
         previewCtx.strokeRect(previewX, previewY, previewWidth, previewHeight);
         const saved = await apiJson("/api/share-card", {
             method:"POST",
+            headers:{
+                Authorization:`Bearer ${activeAttemptToken || ""}`,
+                "X-NFT-Object-Id":selectedNft?.objectId || ""
+            },
             body:JSON.stringify({
                 dataUrl:canvas.toDataURL("image/png"),
                 previewDataUrl:previewCanvas.toDataURL("image/png")
@@ -2023,6 +2028,10 @@ async function boot(){
             <button id="disconnectWalletBtn" style="text-align:center;" hidden>DISCONNECT WALLET</button>
             <div class="wallet-list" id="walletList"></div>
             <div id="nftSelection"></div>
+            <details style="margin-top:18px;text-align:left;color:#81909e;font-size:11px;line-height:1.55;">
+                <summary style="cursor:pointer;color:#63d8ff;letter-spacing:1px;">DATA &amp; PRIVACY</summary>
+                <div style="margin-top:8px;">VOSS records the selected NFT, wallet address, case choices, parameter changes and final result. Share-card images expire after 30 days. Wallet addresses are removed from completed records after 90 days. Decision data remains linked to the public NFT object ID for aggregate result analysis.</div>
+            </details>
         </div>
     `;
 

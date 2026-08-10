@@ -9,9 +9,13 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "node server.mjs",
-    "check": "node --check server.mjs"
+    "check": "node --check server.mjs && node --test tests/server-static.test.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
   }
 }

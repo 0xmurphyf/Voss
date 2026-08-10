@@ -2,11 +2,13 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 
 const root = process.cwd();
 const port = Number.parseInt(process.env.PORT || "4173", 10);
 const voxxstakeApi = (process.env.VOXXSTAKE_API_URL || "https://voxx.up.railway.app/api").replace(/\/$/, "");
-const verifiedScans = new Map();
+const rateBuckets = new Map();
 let pool = null;
 let attemptsReady = Promise.resolve();
 
@@ -33,6 +35,12 @@ if (process.env.DATABASE_URL) {
       completed_at TIMESTAMPTZ
     );
     ALTER TABLE voss_nft_attempts ADD COLUMN IF NOT EXISTS image_url TEXT;
+    CREATE TABLE IF NOT EXISTS voss_verified_scans (
+      token_hash TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ
+    );
     CREATE TABLE IF NOT EXISTS voss_case_decisions (
       object_id TEXT NOT NULL REFERENCES voss_nft_attempts(object_id) ON DELETE CASCADE,
       case_number INTEGER NOT NULL CHECK (case_number BETWEEN 1 AND 12),
@@ -45,13 +53,21 @@ if (process.env.DATABASE_URL) {
     );
     CREATE TABLE IF NOT EXISTS voss_share_cards (
       id TEXT PRIMARY KEY,
+      object_id TEXT,
       image BYTEA NOT NULL,
       preview_image BYTEA,
       content_type TEXT NOT NULL DEFAULT 'image/png',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-    ALTER TABLE voss_share_cards ADD COLUMN IF NOT EXISTS preview_image BYTEA
+    ALTER TABLE voss_share_cards ADD COLUMN IF NOT EXISTS preview_image BYTEA;
+    ALTER TABLE voss_share_cards ADD COLUMN IF NOT EXISTS object_id TEXT;
+    CREATE INDEX IF NOT EXISTS voss_share_cards_object_created_idx ON voss_share_cards(object_id, created_at)
   `);
+  attemptsReady.then(() => cleanupExpiredData()).catch(error => console.error("Initial data cleanup failed:", error));
+  const cleanupTimer = setInterval(() => {
+    cleanupExpiredData().catch(error => console.error("Scheduled data cleanup failed:", error));
+  }, 6 * 60 * 60_000);
+  cleanupTimer.unref();
 }
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -84,9 +100,115 @@ function sendJson(res, status, body) {
   res.end(encoded);
 }
 
+function requestIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+}
+
+function allowRequest(req, res, scope, limit, windowMs) {
+  const now = Date.now();
+  if (rateBuckets.size > 5000) {
+    for (const [bucketKey, value] of rateBuckets) {
+      if (value.resetAt <= now) rateBuckets.delete(bucketKey);
+    }
+  }
+  const key = `${scope}:${requestIp(req)}`;
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateBuckets.set(key, { count:1, resetAt:now + windowMs });
+    return true;
+  }
+  if (bucket.count >= limit) {
+    res.setHeader("Retry-After", String(Math.ceil((bucket.resetAt - now) / 1000)));
+    sendJson(res, 429, { detail:"Too many requests. Try again later." });
+    return false;
+  }
+  bucket.count += 1;
+  return true;
+}
+
+async function cleanupExpiredData() {
+  if (!pool) return;
+  await pool.query("DELETE FROM voss_verified_scans WHERE expires_at < NOW() - INTERVAL '1 day' OR used_at < NOW() - INTERVAL '1 day'");
+  await pool.query("DELETE FROM voss_share_cards WHERE created_at < NOW() - INTERVAL '30 days'");
+  await pool.query("UPDATE voss_nft_attempts SET wallet_address=NULL WHERE completed_at < NOW() - INTERVAL '90 days' AND wallet_address IS NOT NULL");
+}
+
+function isPrivateAddress(address) {
+  const normalized = String(address).toLowerCase().split("%")[0];
+  if (normalized.startsWith("::ffff:")) return isPrivateAddress(normalized.slice(7));
+  if (isIP(normalized) === 4) {
+    const parts = normalized.split(".").map(Number);
+    const [a,b] = parts;
+    return a === 0 || a === 10 || a === 127 || a >= 224 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19));
+  }
+  if (isIP(normalized) === 6) {
+    return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") ||
+      normalized.startsWith("fd") || /^fe[89ab]/.test(normalized);
+  }
+  return true;
+}
+
+async function assertPublicImageUrl(value) {
+  const url = new URL(value);
+  if (!/^https?:$/.test(url.protocol)) throw new Error("NFT image source is not allowed");
+  if (url.username || url.password) throw new Error("NFT image source is not allowed");
+  const addresses = isIP(url.hostname)
+    ? [{ address:url.hostname }]
+    : await lookup(url.hostname, { all:true, verbatim:true });
+  if (!addresses.length || addresses.some(entry => isPrivateAddress(entry.address))) {
+    throw new Error("NFT image source is not allowed");
+  }
+  return url;
+}
+
+async function fetchPublicImage(value, maxBytes) {
+  let current = await assertPublicImageUrl(value);
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    const response = await fetch(current, {
+      redirect:"manual",
+      signal:AbortSignal.timeout(10_000),
+      headers:{ Accept:"image/*" }
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location || redirects === 3) throw new Error("NFT image redirect is not allowed");
+      current = await assertPublicImageUrl(new URL(location, current).href);
+      continue;
+    }
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok || !contentType.toLowerCase().startsWith("image/")) {
+      throw new Error("NFT image source did not return an image");
+    }
+    const declaredSize = Number(response.headers.get("content-length") || 0);
+    if (declaredSize > maxBytes) throw new Error("NFT image is too large");
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("NFT image source is unavailable");
+    const chunks = [];
+    let size = 0;
+    while (true) {
+      const { done, value:chunk } = await reader.read();
+      if (done) break;
+      size += chunk.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        throw new Error("NFT image is too large");
+      }
+      chunks.push(Buffer.from(chunk));
+    }
+    return { image:Buffer.concat(chunks), contentType };
+  }
+  throw new Error("NFT image is unavailable");
+}
+
 async function proxyVoxxstake(path, body, authorization) {
   const response = await fetch(`${voxxstakeApi}${path}`, {
     method: "POST",
+    signal:AbortSignal.timeout(15_000),
     headers: {
       "Content-Type": "application/json",
       "Accept": "application/json",
@@ -133,11 +255,17 @@ async function ownedNftsFromVoxxstake(authorization) {
   return { nfts, scanPartial };
 }
 
-function cleanupVerifiedScans() {
-  const now = Date.now();
-  for (const [key, value] of verifiedScans) {
-    if (value.expiresAt <= now) verifiedScans.delete(key);
-  }
+async function lockVerifiedScan(client, scanToken, objectId) {
+  const result = await client.query(
+    `SELECT payload FROM voss_verified_scans
+     WHERE token_hash=$1 AND expires_at>NOW() AND used_at IS NULL
+     FOR UPDATE`,
+    [tokenHash(scanToken || "")]
+  );
+  const nfts = Array.isArray(result.rows[0]?.payload?.nfts) ? result.rows[0].payload.nfts : [];
+  const nft = nfts.find(item => item?.objectId === objectId);
+  if (!nft) return null;
+  return nft;
 }
 
 createServer(async (req, res) => {
@@ -147,12 +275,14 @@ createServer(async (req, res) => {
     requestedPath = raw;
 
     if (raw === "/api/gate/nonce" && req.method === "POST") {
+      if (!allowRequest(req, res, "gate-nonce", 20, 60_000)) return;
       const upstream = await proxyVoxxstake("/auth/nonce", await readJsonBody(req));
       sendJson(res, upstream.status, upstream.data);
       return;
     }
 
     if (raw === "/api/gate/verify" && req.method === "POST") {
+      if (!allowRequest(req, res, "gate-verify", 20, 60_000)) return;
       const upstream = await proxyVoxxstake("/auth/verify", await readJsonBody(req));
       sendJson(res, upstream.status, upstream.data);
       return;
@@ -160,6 +290,7 @@ createServer(async (req, res) => {
 
     if (raw === "/api/gate/scan" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
+      if (!allowRequest(req, res, "gate-scan", 12, 60_000)) return;
       const authorization = req.headers.authorization || "";
       if (!authorization.startsWith("Bearer ")) {
         sendJson(res, 401, { detail: "Wallet authentication required" });
@@ -187,13 +318,12 @@ createServer(async (req, res) => {
           completedCases:Number(attempt?.completed_cases || 0)
         };
       });
-      cleanupVerifiedScans();
       const scanToken = randomBytes(24).toString("hex");
-      verifiedScans.set(scanToken, {
-        objectIds:new Set(ids),
-        nftsById:new Map(ownership.nfts.map((nft) => [nft.objectId, nft])),
-        expiresAt:Date.now() + 5 * 60_000
-      });
+      await pool.query(
+        `INSERT INTO voss_verified_scans (token_hash, payload, expires_at)
+         VALUES ($1, $2::jsonb, NOW() + INTERVAL '5 minutes')`,
+        [tokenHash(scanToken), JSON.stringify({ nfts:ownership.nfts })]
+      );
       sendJson(res, 200, {
         nfts,
         scanPartial:ownership.scanPartial,
@@ -206,22 +336,27 @@ createServer(async (req, res) => {
     if (raw === "/api/attempt/start" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
       const body = await readJsonBody(req);
-      const verified = verifiedScans.get(String(body.scanToken || ""));
-      if (!verified || verified.expiresAt <= Date.now() || !verified.objectIds.has(body.objectId)) {
-        sendJson(res, 403, { detail:"A fresh ownership scan is required" });
-        return;
-      }
       await attemptsReady;
       const attemptToken = randomBytes(32).toString("hex");
-      const verifiedNft = verified.nftsById.get(body.objectId);
+      const client = await pool.connect();
       try {
-        await pool.query(
+        await client.query("BEGIN");
+        const verifiedNft = await lockVerifiedScan(client, body.scanToken, body.objectId);
+        if (!verifiedNft) {
+          await client.query("ROLLBACK");
+          sendJson(res, 403, { detail:"A fresh ownership scan is required" });
+          return;
+        }
+        await client.query(
           `INSERT INTO voss_nft_attempts
             (object_id, nft_number, nft_name, image_url, wallet_address, attempt_token_hash)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [body.objectId, String(body.number || "UNKNOWN"), String(body.name || "VOXX NFT"), verifiedNft?.imageUrl || null, body.address || null, tokenHash(attemptToken)]
         );
+        await client.query("UPDATE voss_verified_scans SET used_at=NOW() WHERE token_hash=$1", [tokenHash(body.scanToken || "")]);
+        await client.query("COMMIT");
       } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
         if (error?.code === "23505") {
           const existing = await pool.query(
             "SELECT status, completed_cases FROM voss_nft_attempts WHERE object_id=$1",
@@ -235,8 +370,9 @@ createServer(async (req, res) => {
           return;
         }
         throw error;
+      } finally {
+        client.release();
       }
-      verifiedScans.delete(String(body.scanToken));
       sendJson(res, 201, { attemptToken, status:"started", completedCases:0 });
       return;
     }
@@ -244,27 +380,39 @@ createServer(async (req, res) => {
     if (raw === "/api/attempt/resume" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
       const body = await readJsonBody(req);
-      const verified = verifiedScans.get(String(body.scanToken || ""));
-      if (!verified || verified.expiresAt <= Date.now() || !verified.objectIds.has(body.objectId)) {
-        sendJson(res, 403, { detail:"A fresh ownership scan is required" });
-        return;
-      }
       await attemptsReady;
       const attemptToken = randomBytes(32).toString("hex");
-      const verifiedNft = verified.nftsById.get(body.objectId);
-      const resumed = await pool.query(
-        `UPDATE voss_nft_attempts
-         SET attempt_token_hash=$1, wallet_address=COALESCE($2,wallet_address),
-             image_url=COALESCE($3,image_url), updated_at=NOW()
-         WHERE object_id=$4 AND status='started'
-         RETURNING completed_cases, progress`,
-        [tokenHash(attemptToken), body.address || null, verifiedNft?.imageUrl || null, body.objectId]
-      );
-      if (!resumed.rowCount) {
-        sendJson(res, 409, { detail:"No unfinished attempt is available" });
-        return;
+      const client = await pool.connect();
+      let resumed;
+      try {
+        await client.query("BEGIN");
+        const verifiedNft = await lockVerifiedScan(client, body.scanToken, body.objectId);
+        if (!verifiedNft) {
+          await client.query("ROLLBACK");
+          sendJson(res, 403, { detail:"A fresh ownership scan is required" });
+          return;
+        }
+        resumed = await client.query(
+          `UPDATE voss_nft_attempts
+           SET attempt_token_hash=$1, wallet_address=COALESCE($2,wallet_address),
+               image_url=COALESCE($3,image_url), updated_at=NOW()
+           WHERE object_id=$4 AND status='started'
+           RETURNING completed_cases, progress`,
+          [tokenHash(attemptToken), body.address || null, verifiedNft?.imageUrl || null, body.objectId]
+        );
+        if (!resumed.rowCount) {
+          await client.query("ROLLBACK");
+          sendJson(res, 409, { detail:"No unfinished attempt is available" });
+          return;
+        }
+        await client.query("UPDATE voss_verified_scans SET used_at=NOW() WHERE token_hash=$1", [tokenHash(body.scanToken || "")]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      } finally {
+        client.release();
       }
-      verifiedScans.delete(String(body.scanToken));
       sendJson(res, 200, {
         attemptToken,
         status:"started",
@@ -277,6 +425,7 @@ createServer(async (req, res) => {
     const nftImageMatch = raw.match(/^\/api\/nft-image\/(0x[0-9a-fA-F]{64})$/);
     if (nftImageMatch && req.method === "GET") {
       if (!requireAttemptsDatabase(res)) return;
+      if (!allowRequest(req, res, "nft-image", 60, 60_000)) return;
       await attemptsReady;
       const result = await pool.query(
         "SELECT image_url FROM voss_nft_attempts WHERE object_id=$1",
@@ -287,39 +436,44 @@ createServer(async (req, res) => {
         sendJson(res, 404, { detail:"NFT image is unavailable" });
         return;
       }
-      let parsed;
       try {
-        parsed = new URL(imageUrl);
-      } catch {
-        sendJson(res, 404, { detail:"NFT image URL is invalid" });
-        return;
+        const { image, contentType } = await fetchPublicImage(imageUrl, 12 * 1024 * 1024);
+        res.writeHead(200, {
+          "Content-Type":contentType,
+          "Content-Length":image.length,
+          "Cache-Control":"public, max-age=3600"
+        });
+        res.end(image);
+      } catch (error) {
+        sendJson(res, 502, { detail:error.message || "NFT image is unavailable" });
       }
-      if (!/^https?:$/.test(parsed.protocol) || parsed.hostname === "localhost" || parsed.hostname.endsWith(".local")) {
-        sendJson(res, 403, { detail:"NFT image source is not allowed" });
-        return;
-      }
-      const imageResponse = await fetch(parsed, { headers:{ Accept:"image/*" } });
-      const contentType = imageResponse.headers.get("content-type") || "";
-      if (!imageResponse.ok || !contentType.toLowerCase().startsWith("image/")) {
-        sendJson(res, 502, { detail:"NFT image source did not return an image" });
-        return;
-      }
-      const image = Buffer.from(await imageResponse.arrayBuffer());
-      if (image.length > 12 * 1024 * 1024) {
-        sendJson(res, 413, { detail:"NFT image is too large" });
-        return;
-      }
-      res.writeHead(200, {
-        "Content-Type":contentType,
-        "Content-Length":image.length,
-        "Cache-Control":"public, max-age=3600"
-      });
-      res.end(image);
       return;
     }
 
     if (raw === "/api/share-card" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
+      if (!allowRequest(req, res, "share-card", 6, 60 * 60_000)) return;
+      const authorization = String(req.headers.authorization || "");
+      const objectId = String(req.headers["x-nft-object-id"] || "");
+      const attemptToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      await attemptsReady;
+      const authorized = await pool.query(
+        `SELECT 1 FROM voss_nft_attempts
+         WHERE object_id=$1 AND attempt_token_hash=$2 AND status='completed'`,
+        [objectId, tokenHash(attemptToken)]
+      );
+      if (!authorized.rowCount) {
+        sendJson(res, 403, { detail:"A completed NFT attempt is required to publish a share card" });
+        return;
+      }
+      const recentCards = await pool.query(
+        "SELECT COUNT(*)::int AS count FROM voss_share_cards WHERE object_id=$1 AND created_at>NOW()-INTERVAL '30 days'",
+        [objectId]
+      );
+      if (Number(recentCards.rows[0]?.count || 0) >= 5) {
+        sendJson(res, 429, { detail:"This NFT has reached its 30-day share-card limit" });
+        return;
+      }
       const body = await readJsonBody(req, 12 * 1024 * 1024);
       const match = String(body.dataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
       const previewMatch = String(body.previewDataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
@@ -336,8 +490,8 @@ createServer(async (req, res) => {
       await attemptsReady;
       const id = randomBytes(12).toString("hex");
       await pool.query(
-        "INSERT INTO voss_share_cards (id, image, preview_image, content_type) VALUES ($1, $2, $3, 'image/png')",
-        [id, image, previewImage]
+        "INSERT INTO voss_share_cards (id, object_id, image, preview_image, content_type) VALUES ($1, $2, $3, $4, 'image/png')",
+        [id, objectId, image, previewImage]
       );
       sendJson(res, 201, { url:`/share/${id}`, imageUrl:`/share/${id}.png`, previewUrl:`/share/${id}-preview.png` });
       return;
@@ -444,40 +598,52 @@ a:hover{background:#10202a;color:#fff}
         return;
       }
       await attemptsReady;
-      const updated = await pool.query(
-        `UPDATE voss_nft_attempts
-         SET completed_cases=GREATEST(completed_cases,$1), progress=$2::jsonb, updated_at=NOW()
-         WHERE object_id=$3 AND attempt_token_hash=$4 AND status='started'
-         RETURNING completed_cases`,
-        [completedCases, JSON.stringify(body.progress || {}), body.objectId, tokenHash(body.attemptToken || "")]
-      );
-      if (!updated.rowCount) {
-        sendJson(res, 403, { detail:"Active NFT attempt not found" });
-        return;
-      }
       const progress = body.progress && typeof body.progress === "object" ? body.progress : {};
       const history = Array.isArray(progress.history) ? progress.history : [];
       const decision = completedCases > 0 ? history[completedCases - 1] : null;
-      if (decision) {
-        await pool.query(
-          `INSERT INTO voss_case_decisions
-             (object_id, case_number, choice, decision_tag, choice_result, state_result)
-           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
-           ON CONFLICT (object_id, case_number) DO UPDATE SET
-             choice=EXCLUDED.choice,
-             decision_tag=EXCLUDED.decision_tag,
-             choice_result=EXCLUDED.choice_result,
-             state_result=EXCLUDED.state_result,
-             recorded_at=NOW()`,
-          [
-            body.objectId,
-            completedCases,
-            String(decision.choice || "UNKNOWN").slice(0, 1000),
-            String(decision.tag || "NEUTRAL").slice(0, 80),
-            JSON.stringify(decision.changes || {}),
-            JSON.stringify(progress.state || {})
-          ]
+      const client = await pool.connect();
+      let updated;
+      try {
+        await client.query("BEGIN");
+        updated = await client.query(
+          `UPDATE voss_nft_attempts
+           SET completed_cases=GREATEST(completed_cases,$1), progress=$2::jsonb, updated_at=NOW()
+           WHERE object_id=$3 AND attempt_token_hash=$4 AND status='started'
+           RETURNING completed_cases`,
+          [completedCases, JSON.stringify(progress), body.objectId, tokenHash(body.attemptToken || "")]
         );
+        if (!updated.rowCount) {
+          await client.query("ROLLBACK");
+          sendJson(res, 403, { detail:"Active NFT attempt not found" });
+          return;
+        }
+        if (decision) {
+          await client.query(
+            `INSERT INTO voss_case_decisions
+               (object_id, case_number, choice, decision_tag, choice_result, state_result)
+             VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
+             ON CONFLICT (object_id, case_number) DO UPDATE SET
+               choice=EXCLUDED.choice,
+               decision_tag=EXCLUDED.decision_tag,
+               choice_result=EXCLUDED.choice_result,
+               state_result=EXCLUDED.state_result,
+               recorded_at=NOW()`,
+            [
+              body.objectId,
+              completedCases,
+              String(decision.choice || "UNKNOWN").slice(0, 1000),
+              String(decision.tag || "NEUTRAL").slice(0, 80),
+              JSON.stringify(decision.changes || {}),
+              JSON.stringify(progress.state || {})
+            ]
+          );
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      } finally {
+        client.release();
       }
       sendJson(res, 200, { completedCases:Number(updated.rows[0].completed_cases) });
       return;
@@ -561,9 +727,9 @@ a:hover{background:#10202a;color:#fff}
     });
     res.end(body);
   } catch (error) {
-    if (requestedPath.startsWith("/api/gate/") || requestedPath.startsWith("/api/attempt/")) {
-      console.error("NFT gate request failed:", error);
-      sendJson(res, 502, { detail: "NFT attempt service is temporarily unavailable" });
+    if (requestedPath.startsWith("/api/")) {
+      console.error("VOSS API request failed:", error);
+      sendJson(res, 502, { detail: "VOSS service is temporarily unavailable" });
       return;
     }
     res.writeHead(404);
