@@ -580,6 +580,7 @@ function showTestEndingMenu() {
                 Object.assign(state,{stability:80,transcendence:70,pragmatism:80,control:55,compassion:80,trust:75,event:events.length});
                 finalIdeology="BALANCE";
             }
+            history_log = events.map(event => ({ caseTitle:event.title, choice:"TEST", tag:"TEST" }));
             clearSave();
             modal.remove();
             render();
@@ -1838,6 +1839,7 @@ async function createShareCardImage(outcome, epilogueText) {
         <div class="content">
             <h3 style="color:#63d8ff; margin-bottom:12px;">Share Card Preview</h3>
             <div id="canvasContainer"></div>
+            <div class="gate-status" id="shareLinkStatus" style="margin:12px 0;">CREATING SHARE LINK...</div>
             <div style="margin-top:16px;">
                 <button id="shareXBtn">SHARE ON X</button>
                 <button id="downloadBtn">Download PNG</button>
@@ -1849,8 +1851,21 @@ async function createShareCardImage(outcome, epilogueText) {
     modal.querySelector("#canvasContainer").appendChild(canvas);
     document.body.appendChild(modal);
 
+    let shareCardUrl = "";
+    const shareLinkStatus = modal.querySelector("#shareLinkStatus");
+    try {
+        const saved = await apiJson("/api/share-card", {
+            method:"POST",
+            body:JSON.stringify({ dataUrl:canvas.toDataURL("image/png") })
+        });
+        shareCardUrl = new URL(saved.url, window.location.origin).href;
+        shareLinkStatus.textContent = "SHARE LINK READY";
+    } catch (error) {
+        shareLinkStatus.textContent = `SHARE LINK UNAVAILABLE — ${error.message || "RETRY"}`;
+    }
+
     modal.querySelector("#shareXBtn").onclick = () => {
-        const shareText = "I passed the test";
+        const shareText = `I passed the test${shareCardUrl ? ` ${shareCardUrl}` : ""}`;
         window.open(`https://x.com/intent/post?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
         playBeep(1050, 70, 'sine', 0.025);
     };

@@ -32,7 +32,13 @@ if (process.env.DATABASE_URL) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       completed_at TIMESTAMPTZ
     );
-    ALTER TABLE voss_nft_attempts ADD COLUMN IF NOT EXISTS image_url TEXT
+    ALTER TABLE voss_nft_attempts ADD COLUMN IF NOT EXISTS image_url TEXT;
+    CREATE TABLE IF NOT EXISTS voss_share_cards (
+      id TEXT PRIMARY KEY,
+      image BYTEA NOT NULL,
+      content_type TEXT NOT NULL DEFAULT 'image/png',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
   `);
 }
 const types = {
@@ -45,12 +51,12 @@ const types = {
   ".mp4": "video/mp4"
 };
 
-async function readJsonBody(req) {
+async function readJsonBody(req, maxSize = 64 * 1024) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 64 * 1024) throw new Error("request body too large");
+    if (size > maxSize) throw new Error("request body too large");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
@@ -295,6 +301,51 @@ createServer(async (req, res) => {
         "Content-Type":contentType,
         "Content-Length":image.length,
         "Cache-Control":"public, max-age=3600"
+      });
+      res.end(image);
+      return;
+    }
+
+    if (raw === "/api/share-card" && req.method === "POST") {
+      if (!requireAttemptsDatabase(res)) return;
+      const body = await readJsonBody(req, 3 * 1024 * 1024);
+      const match = String(body.dataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        sendJson(res, 400, { detail:"A PNG share card is required" });
+        return;
+      }
+      const image = Buffer.from(match[1], "base64");
+      if (!image.length || image.length > 2 * 1024 * 1024) {
+        sendJson(res, 413, { detail:"Share card image is too large" });
+        return;
+      }
+      await attemptsReady;
+      const id = randomBytes(12).toString("hex");
+      await pool.query(
+        "INSERT INTO voss_share_cards (id, image, content_type) VALUES ($1, $2, 'image/png')",
+        [id, image]
+      );
+      sendJson(res, 201, { url:`/share/${id}.png` });
+      return;
+    }
+
+    const shareCardMatch = raw.match(/^\/share\/([0-9a-f]{24})\.png$/);
+    if (shareCardMatch && req.method === "GET") {
+      if (!requireAttemptsDatabase(res)) return;
+      await attemptsReady;
+      const result = await pool.query(
+        "SELECT image, content_type FROM voss_share_cards WHERE id=$1",
+        [shareCardMatch[1]]
+      );
+      if (!result.rowCount) {
+        sendJson(res, 404, { detail:"Share card not found" });
+        return;
+      }
+      const image = result.rows[0].image;
+      res.writeHead(200, {
+        "Content-Type":result.rows[0].content_type,
+        "Content-Length":image.length,
+        "Cache-Control":"public, max-age=31536000, immutable"
       });
       res.end(image);
       return;
