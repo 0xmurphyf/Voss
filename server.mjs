@@ -310,7 +310,7 @@ createServer(async (req, res) => {
 
     if (raw === "/api/share-card" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
-      const body = await readJsonBody(req, 6 * 1024 * 1024);
+      const body = await readJsonBody(req, 12 * 1024 * 1024);
       const match = String(body.dataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
       const previewMatch = String(body.previewDataUrl || "").match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
       if (!match || !previewMatch) {
@@ -319,7 +319,7 @@ createServer(async (req, res) => {
       }
       const image = Buffer.from(match[1], "base64");
       const previewImage = Buffer.from(previewMatch[1], "base64");
-      if (!image.length || !previewImage.length || image.length > 2 * 1024 * 1024 || previewImage.length > 3 * 1024 * 1024) {
+      if (!image.length || !previewImage.length || image.length > 6 * 1024 * 1024 || previewImage.length > 4 * 1024 * 1024) {
         sendJson(res, 413, { detail:"Share card image is too large" });
         return;
       }

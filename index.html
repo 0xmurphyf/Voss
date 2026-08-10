@@ -1702,30 +1702,56 @@ async function createShareCardImage(outcome, epilogueText) {
     modal.setAttribute("aria-label", "Share card preview");
 
     const canvas = document.createElement("canvas");
-    canvas.width = 720;
-    canvas.height = 660;
+    const cardWidth = 720;
+    const cardHeight = 660;
+    const outputScale = 2;
+    canvas.width = cardWidth * outputScale;
+    canvas.height = cardHeight * outputScale;
     const ctx = canvas.getContext("2d");
+    ctx.scale(outputScale, outputScale);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
     // Ending-specific artwork background with a strong readability veil.
     ctx.fillStyle = "#04070b";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, cardWidth, cardHeight);
     const endingType = getEndingAssetType(outcome);
     try {
         const backgroundImage = await loadCanvasImage(endingPosters[endingType]);
-        drawImageCover(ctx, backgroundImage, canvas.width, canvas.height);
+        drawImageCover(ctx, backgroundImage, cardWidth, cardHeight);
     } catch (_) {}
 
-    const backgroundVeil = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    const backgroundVeil = ctx.createLinearGradient(0, 0, cardWidth, cardHeight);
     backgroundVeil.addColorStop(0, "rgba(2, 4, 7, 0.9)");
     backgroundVeil.addColorStop(0.58, "rgba(2, 4, 7, 0.7)");
     backgroundVeil.addColorStop(1, "rgba(2, 4, 7, 0.84)");
     ctx.fillStyle = backgroundVeil;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, cardWidth, cardHeight);
+
+    // The NFT is a large background layer; it never changes text or frame geometry.
+    const numStr = getPaddedNumber();
+    const nftImageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
+        ? `/api/nft-image/${selectedNft.objectId}`
+        : safeImageUrl(selectedNft?.imageUrl);
+    if (nftImageUrl) {
+        try {
+            const nftImage = await loadCanvasImage(nftImageUrl);
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            drawImageCoverRect(ctx, nftImage, 400, 122, 278, 278);
+            ctx.restore();
+            const nftFade = ctx.createLinearGradient(360, 0, 590, 0);
+            nftFade.addColorStop(0, "rgba(2,4,7,0.94)");
+            nftFade.addColorStop(1, "rgba(2,4,7,0.12)");
+            ctx.fillStyle = nftFade;
+            ctx.fillRect(350, 112, 338, 298);
+        } catch (_) {}
+    }
 
     // Border
     ctx.strokeStyle = "#18232d";
     ctx.lineWidth = 2;
-    ctx.strokeRect(24, 24, canvas.width - 48, canvas.height - 48);
+    ctx.strokeRect(24, 24, cardWidth - 48, cardHeight - 48);
 
     // Title
     ctx.fillStyle = "#63d8ff";
@@ -1733,7 +1759,6 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.fillText("VOXX VOSS PROTOCOL v2.6", 44, 68);
 
     // Candidate line
-    const numStr = getPaddedNumber();
     ctx.fillStyle = "#8a929b";
     ctx.font = "15px 'Space Mono', monospace";
 
@@ -1748,30 +1773,8 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(44, 115);
-    ctx.lineTo(canvas.width - 44, 115);
+    ctx.lineTo(cardWidth - 44, 115);
     ctx.stroke();
-
-    // Selected candidate NFT
-    const nftImageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
-        ? `/api/nft-image/${selectedNft.objectId}`
-        : safeImageUrl(selectedNft?.imageUrl);
-    if (nftImageUrl) {
-        try {
-            const nftImage = await loadCanvasImage(nftImageUrl);
-            const nftX = 526;
-            const nftY = 132;
-            const nftSize = 146;
-            drawImageCoverRect(ctx, nftImage, nftX, nftY, nftSize, nftSize);
-            ctx.strokeStyle = "#596673";
-            ctx.lineWidth = 1;
-            ctx.strokeRect(nftX, nftY, nftSize, nftSize);
-            ctx.fillStyle = "#aeb7c0";
-            ctx.font = "10px 'Space Mono', monospace";
-            ctx.textAlign = "right";
-            ctx.fillText(`NFT #${numStr}`, nftX + nftSize, nftY + nftSize + 16);
-            ctx.textAlign = "left";
-        } catch (_) {}
-    }
 
     // Ending Title
     ctx.fillStyle = outcome.color === "gold" ? "#d4b35a" :
@@ -1808,7 +1811,7 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.strokeStyle = "#18232d";
     ctx.beginPath();
     ctx.moveTo(44, y + 22);
-    ctx.lineTo(canvas.width - 44, y + 22);
+    ctx.lineTo(cardWidth - 44, y + 22);
     ctx.stroke();
 
     ctx.fillStyle = "#63d8ff";
@@ -1831,7 +1834,7 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.fillStyle = "#81909e";
     ctx.font = "10.5px 'Space Mono', monospace";
     const generatedAt = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
-    const footerY = Math.min(canvas.height - 46, y + 142);
+    const footerY = Math.min(cardHeight - 46, y + 142);
     ctx.fillText("VOXX INC.  •  SECURE NODE  •  " + generatedAt, 44, footerY);
 
     modal.innerHTML = `
@@ -1859,9 +1862,9 @@ async function createShareCardImage(outcome, epilogueText) {
         const previewCtx = previewCanvas.getContext("2d");
         previewCtx.fillStyle = "#020407";
         previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
-        const previewCropHeight = Math.min(canvas.height, y + 130);
+        const previewCropHeight = Math.min(cardHeight, y + 130);
         const previewScale = 1.8;
-        const previewWidth = canvas.width * previewScale;
+        const previewWidth = cardWidth * previewScale;
         const previewHeight = previewCropHeight * previewScale;
         const previewX = (previewCanvas.width - previewWidth) / 2;
         const previewY = (previewCanvas.height - previewHeight) / 2;
@@ -1869,7 +1872,7 @@ async function createShareCardImage(outcome, epilogueText) {
         previewCtx.shadowBlur = 28;
         previewCtx.drawImage(
             canvas,
-            0, 0, canvas.width, previewCropHeight,
+            0, 0, canvas.width, previewCropHeight * outputScale,
             previewX, previewY, previewWidth, previewHeight
         );
         previewCtx.shadowBlur = 0;
