@@ -366,7 +366,7 @@ createServer(async (req, res) => {
 html,body{margin:0;min-height:100%;background:#020407;color:#f2f5f7;font-family:Inter,"Segoe UI",Arial,sans-serif}
 body{display:grid;place-items:center;padding:28px 16px;box-sizing:border-box}
 main{width:100%;display:flex;flex-direction:column;align-items:center;gap:20px}
-img{display:block;width:min(360px,100%);height:auto;border:1px solid #263744;box-shadow:0 18px 70px rgba(0,0,0,.55)}
+img{display:block;width:min(720px,100%);height:auto;border:1px solid #263744;box-shadow:0 18px 70px rgba(0,0,0,.55)}
 a{display:inline-block;padding:12px 24px;border:1px solid #63d8ff;color:#63d8ff;background:#070b10;text-decoration:none;letter-spacing:2px;font-size:13px}
 a:hover{background:#10202a;color:#fff}
 </style>
