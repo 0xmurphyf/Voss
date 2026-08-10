@@ -76,6 +76,7 @@ button {
     cursor:pointer; font-family:inherit; text-align:left;
     font-size:inherit; letter-spacing:0.5px;
 }
+button[hidden] { display:none; }
 button::before { content:"> "; color:#63d8ff; opacity:0.5; }
 button:hover { background:#111; border-color:#63d8ff; border-left-color:#63d8ff; color:#e8e8e8; }
 button small { color:#c1c8cf; font-size:0.82em; display:block; margin-top:3px; pointer-events:none; }
@@ -643,6 +644,28 @@ function createWalletRegistry() {
 }
 
 const walletRegistry = createWalletRegistry();
+
+async function fullyDisconnectWallet() {
+    const wallet = connectedWallet;
+    try {
+        const disconnect = wallet?.features?.["standard:disconnect"]?.disconnect;
+        if (typeof disconnect === "function") await disconnect();
+    } catch (error) {
+        console.warn("Wallet disconnect request failed; clearing the local session.", error);
+    } finally {
+        connectedWallet = null;
+        connectedAccount = null;
+        gateAuthToken = null;
+        activeScanToken = null;
+        activeAttemptToken = null;
+        selectedNft = null;
+        candidateNumber = null;
+        finalRecorded = false;
+        isTestMode = false;
+        clearSave();
+        location.reload();
+    }
+}
 
 async function apiJson(path, options = {}) {
     const response = await fetch(path, {
@@ -1997,6 +2020,7 @@ async function boot(){
             <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:20px;">NFT-RESTRICTED EXECUTIVE SELECTION SYSTEM</div>
             <div class="gate-status" id="gateStatus">CONNECT A SUI WALLET TO VERIFY VOXX OWNERSHIP.</div>
             <button id="findWalletsBtn" style="text-align:center;">CONNECT SUI WALLET</button>
+            <button id="disconnectWalletBtn" style="text-align:center;" hidden>DISCONNECT WALLET</button>
             <div class="wallet-list" id="walletList"></div>
             <div id="nftSelection"></div>
         </div>
@@ -2005,7 +2029,13 @@ async function boot(){
     const status = document.getElementById("gateStatus");
     const walletList = document.getElementById("walletList");
     const selection = document.getElementById("nftSelection");
+    const findWalletsBtn = document.getElementById("findWalletsBtn");
+    const disconnectWalletBtn = document.getElementById("disconnectWalletBtn");
     const setStatus = message => { status.textContent = message; };
+    const showDisconnect = () => {
+        findWalletsBtn.hidden = true;
+        disconnectWalletBtn.hidden = false;
+    };
 
     const showNfts = scan => {
         activeScanToken = scan.scanToken || null;
@@ -2102,18 +2132,26 @@ async function boot(){
                 walletList.querySelectorAll("button").forEach(item => item.disabled = true);
                 selection.innerHTML = "";
                 try {
-                    showNfts(await connectAndScan(wallets[Number(button.dataset.walletIndex)], setStatus));
+                    const scan = await connectAndScan(wallets[Number(button.dataset.walletIndex)], setStatus);
+                    showDisconnect();
+                    showNfts(scan);
                 } catch (error) {
                     setStatus(`VERIFICATION FAILED: ${error.message || "UNKNOWN ERROR"}`);
+                    if (connectedWallet) showDisconnect();
                     walletList.querySelectorAll("button").forEach(item => item.disabled = false);
                 }
             };
         });
     };
 
-    document.getElementById("findWalletsBtn").onclick = () => {
+    findWalletsBtn.onclick = () => {
         setStatus("DETECTING SUI WALLETS...");
         setTimeout(showWallets, 250);
+    };
+    disconnectWalletBtn.onclick = async () => {
+        disconnectWalletBtn.disabled = true;
+        disconnectWalletBtn.textContent = "DISCONNECTING...";
+        await fullyDisconnectWallet();
     };
 
 }
