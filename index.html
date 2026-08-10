@@ -1861,12 +1861,17 @@ async function createShareCardImage(outcome, epilogueText) {
         previewCtx.fillStyle = "#020407";
         previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
         const previewHeight = 570;
-        const previewWidth = canvas.width * (previewHeight / canvas.height);
+        const previewCropHeight = Math.min(canvas.height, y + 130);
+        const previewWidth = canvas.width * (previewHeight / previewCropHeight);
         const previewX = (previewCanvas.width - previewWidth) / 2;
         const previewY = (previewCanvas.height - previewHeight) / 2;
         previewCtx.shadowColor = "rgba(0,0,0,0.72)";
         previewCtx.shadowBlur = 28;
-        previewCtx.drawImage(canvas, previewX, previewY, previewWidth, previewHeight);
+        previewCtx.drawImage(
+            canvas,
+            0, 0, canvas.width, previewCropHeight,
+            previewX, previewY, previewWidth, previewHeight
+        );
         previewCtx.shadowBlur = 0;
         previewCtx.strokeStyle = "#263744";
         previewCtx.strokeRect(previewX, previewY, previewWidth, previewHeight);
