@@ -129,7 +129,6 @@ function allowRequest(req, res, scope, limit, windowMs) {
 async function cleanupExpiredData() {
   if (!pool) return;
   await pool.query("DELETE FROM voss_verified_scans WHERE expires_at < NOW() - INTERVAL '1 day' OR used_at < NOW() - INTERVAL '1 day'");
-  await pool.query("DELETE FROM voss_share_cards WHERE created_at < NOW() - INTERVAL '30 days'");
   await pool.query("UPDATE voss_nft_attempts SET wallet_address=NULL WHERE completed_at < NOW() - INTERVAL '90 days' AND wallet_address IS NOT NULL");
 }
 
@@ -467,11 +466,11 @@ createServer(async (req, res) => {
         return;
       }
       const recentCards = await pool.query(
-        "SELECT COUNT(*)::int AS count FROM voss_share_cards WHERE object_id=$1 AND created_at>NOW()-INTERVAL '30 days'",
+        "SELECT COUNT(*)::int AS count FROM voss_share_cards WHERE object_id=$1",
         [objectId]
       );
       if (Number(recentCards.rows[0]?.count || 0) >= 5) {
-        sendJson(res, 429, { detail:"This NFT has reached its 30-day share-card limit" });
+        sendJson(res, 429, { detail:"This NFT has reached its share-card limit" });
         return;
       }
       const body = await readJsonBody(req, 12 * 1024 * 1024);

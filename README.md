@@ -41,8 +41,8 @@ selected NFT's number becomes the candidate number throughout the simulation.
 ## Data retention and safeguards
 
 VOSS stores each NFT's case choices, parameter changes, progress and final
-result. Published share-card images expire after 30 days, and wallet addresses
-are removed from completed records after 90 days. Share publishing requires a
+result. Published share-card images are retained, and wallet addresses are
+removed from completed records after 90 days. Share publishing requires a
 completed attempt token and is limited by IP and NFT. Ownership scan tokens are
 stored in PostgreSQL so deploys and multiple Railway instances do not invalidate
 an active five-minute scan.

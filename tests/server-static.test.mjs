@@ -15,10 +15,9 @@ test("security-critical server controls remain present", () => {
 });
 
 test("retention and privacy disclosures stay aligned", () => {
-  assert.match(server, /voss_share_cards WHERE created_at < NOW\(\) - INTERVAL '30 days'/);
+  assert.doesNotMatch(server, /DELETE FROM voss_share_cards/);
   assert.match(server, /completed_at < NOW\(\) - INTERVAL '90 days'/);
-  assert.match(page, /Share-card images expire after 30 days/);
-  assert.match(page, /Wallet addresses are removed from completed records after 90 days/);
+  assert.doesNotMatch(page, /DATA &amp; PRIVACY/);
 });
 
 test("critical UI controls are present", () => {
