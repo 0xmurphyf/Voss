@@ -1441,7 +1441,7 @@ async function loadServerResultStats() {
         lines.push(`${name.padEnd(30,".")} ${String(count).padStart(4," ")}  ${percentage.padStart(5," ")}%`);
     });
     const case12Total = Number(case12.total || 0);
-    lines.push("", "CASE 12 OPTION DISTRIBUTION", SEP2(), `RECORDED DECISIONS: ${case12Total}`);
+    lines.push("CASE 12 OPTION DISTRIBUTION", SEP2(), `RECORDED DECISIONS: ${case12Total}`);
     if (case12Total < 20) lines.push("EARLY DATA — SMALL SAMPLE");
     (Array.isArray(case12.options) ? case12.options : []).forEach(option => {
         const label = String(option.choice || "UNKNOWN").toUpperCase();
@@ -1450,7 +1450,7 @@ async function loadServerResultStats() {
         lines.push(`${label.padEnd(30,".")} ${String(count).padStart(4," ")}  ${percentage.padStart(5," ")}%`);
     });
     if (!case12Total) lines.push("NO COMPLETED CASE 12 DECISIONS YET");
-    return lines.join("\n");
+    return lines.join("\n\n");
 }
 
 function epilogue(lastTag,type){
