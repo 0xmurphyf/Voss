@@ -28,4 +28,6 @@ test("critical UI controls are present", () => {
   assert.match(page, /SERVER RESULT DISTRIBUTION/);
   assert.match(page, /CASE 12 OPTION DISTRIBUTION/);
   assert.match(page, /GENERATE SHARE CARD/);
+  assert.match(page, /rel="apple-touch-icon"/);
+  assert.match(page, /rel="manifest" href="\/site\.webmanifest"/);
 });

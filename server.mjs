@@ -76,6 +76,7 @@ const types = {
   ".png": "image/png",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".mp4": "video/mp4"
 };
 

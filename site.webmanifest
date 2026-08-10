@@ -1,0 +1,23 @@
+{
+  "name": "VOSS Protocol",
+  "short_name": "VOSS",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020407",
+  "theme_color": "#020407",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
