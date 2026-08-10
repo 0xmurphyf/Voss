@@ -833,6 +833,18 @@ function clearFinalEvaluationBackground() {
 
 function setFinalEvaluationBackground(outcomeOrType) {
     clearFinalEvaluationBackground();
+    const nftImageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
+        ? `/api/nft-image/${selectedNft.objectId}`
+        : safeImageUrl(selectedNft?.imageUrl);
+    if (nftImageUrl) {
+        const image = document.createElement("img");
+        image.id = "finalEvaluationBackground";
+        image.src = nftImageUrl;
+        image.alt = "";
+        image.setAttribute("aria-hidden", "true");
+        document.body.prepend(image);
+        return;
+    }
     const type = getEndingAssetType(outcomeOrType);
     const video = document.createElement("video");
     video.id = "finalEvaluationBackground";
@@ -1728,25 +1740,10 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.fillStyle = backgroundVeil;
     ctx.fillRect(0, 0, cardWidth, cardHeight);
 
-    // The NFT is a large background layer; it never changes text or frame geometry.
     const numStr = getPaddedNumber();
     const nftImageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
         ? `/api/nft-image/${selectedNft.objectId}`
         : safeImageUrl(selectedNft?.imageUrl);
-    if (nftImageUrl) {
-        try {
-            const nftImage = await loadCanvasImage(nftImageUrl);
-            ctx.save();
-            ctx.globalAlpha = 0.5;
-            drawImageCoverRect(ctx, nftImage, 400, 122, 278, 278);
-            ctx.restore();
-            const nftFade = ctx.createLinearGradient(360, 0, 590, 0);
-            nftFade.addColorStop(0, "rgba(2,4,7,0.94)");
-            nftFade.addColorStop(1, "rgba(2,4,7,0.12)");
-            ctx.fillStyle = nftFade;
-            ctx.fillRect(350, 112, 338, 298);
-        } catch (_) {}
-    }
 
     // Border
     ctx.strokeStyle = "#18232d";
@@ -1775,6 +1772,25 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.moveTo(44, 115);
     ctx.lineTo(cardWidth - 44, 115);
     ctx.stroke();
+
+    // Selected candidate NFT, 50% larger than the previous 146px card image.
+    if (nftImageUrl) {
+        try {
+            const nftImage = await loadCanvasImage(nftImageUrl);
+            const nftX = 453;
+            const nftY = 132;
+            const nftSize = 219;
+            drawImageCoverRect(ctx, nftImage, nftX, nftY, nftSize, nftSize);
+            ctx.strokeStyle = "#596673";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(nftX, nftY, nftSize, nftSize);
+            ctx.fillStyle = "#aeb7c0";
+            ctx.font = "10px 'Space Mono', monospace";
+            ctx.textAlign = "right";
+            ctx.fillText(`NFT #${numStr}`, nftX + nftSize, nftY + nftSize + 16);
+            ctx.textAlign = "left";
+        } catch (_) {}
+    }
 
     // Ending Title
     ctx.fillStyle = outcome.color === "gold" ? "#d4b35a" :
