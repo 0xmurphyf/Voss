@@ -1893,7 +1893,7 @@ async function createShareCardImage(outcome, epilogueText) {
             .replace(/^NEW ENDING\s*—\s*/i, "")
             .replace(/^ENDING\s+[A-Z]\s*—\s*/i, "")
             .trim();
-        const shareText = `Test result : ${resultName}${shareCardUrl ? ` ${shareCardUrl}` : ""}`;
+        const shareText = `TEST RESULT : ${resultName}${shareCardUrl ? ` ${shareCardUrl}` : ""}`;
         window.open(`https://x.com/intent/post?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
         playBeep(1050, 70, 'sine', 0.025);
     };
