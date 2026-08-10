@@ -1860,7 +1860,7 @@ async function createShareCardImage(outcome, epilogueText) {
         previewCtx.fillStyle = "#020407";
         previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
         const previewCropHeight = Math.min(canvas.height, y + 130);
-        const previewScale = 1.65;
+        const previewScale = 1.6;
         const previewWidth = canvas.width * previewScale;
         const previewHeight = previewCropHeight * previewScale;
         const previewX = (previewCanvas.width - previewWidth) / 2;
@@ -1889,7 +1889,11 @@ async function createShareCardImage(outcome, epilogueText) {
     }
 
     modal.querySelector("#shareXBtn").onclick = () => {
-        const shareText = `I passed the test${shareCardUrl ? ` ${shareCardUrl}` : ""}`;
+        const resultName = outcome.name
+            .replace(/^NEW ENDING\s*—\s*/i, "")
+            .replace(/^ENDING\s+[A-Z]\s*—\s*/i, "")
+            .trim();
+        const shareText = `Test result : ${resultName}${shareCardUrl ? ` ${shareCardUrl}` : ""}`;
         window.open(`https://x.com/intent/post?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
         playBeep(1050, 70, 'sine', 0.025);
     };
