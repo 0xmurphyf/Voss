@@ -8,7 +8,7 @@ import { isIP } from "node:net";
 
 const root = process.cwd();
 const port = Number.parseInt(process.env.PORT || "4173", 10);
-const voxxstakeApi = (process.env.VOXXSTAKE_API_URL || "https://voxx.up.railway.app/api").replace(/\/$/, "");
+const voxxstakeApi = (process.env.VOXXSTAKE_API_URL || "https://voxxinc.xyz/api").replace(/\/$/, "");
 const publicOrigin = (process.env.PUBLIC_ORIGIN || "https://voss.voxxinc.xyz").replace(/\/$/, "");
 const rateBuckets = new Map();
 let pool = null;
