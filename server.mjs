@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import * as fs from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
@@ -81,6 +82,16 @@ const types = {
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".mp4": "video/mp4"
 };
+
+// 启动前预读常用图标进内存 (types 已定义)
+const ICON_CACHE = new Map();
+const ICON_FILES = ["favicon.ico", "icon-192x192.png", "icon-512x512.png", "site.webmanifest"];
+for (const f of ICON_FILES) {
+  try {
+    const buf = fs.readFileSync(join(root, f));
+    ICON_CACHE.set("/" + f, { buf, contentType: types[extname(f)] || "application/octet-stream" });
+  } catch (_) {}
+}
 const cacheableStaticTypes = new Set([".ico", ".png", ".webp", ".svg", ".webmanifest"]);
 
 async function readJsonBody(req, maxSize = 64 * 1024) {
@@ -733,6 +744,30 @@ a:hover{background:#10202a;color:#fff}
         return;
       }
       sendJson(res, 200, { status:"completed", completedAt:updated.rows[0].completed_at });
+      return;
+    }
+
+    // favicon.ico 缺失时回退到 icon-192x192.png (内存或磁盘)
+    if (raw === "/favicon.ico" && !ICON_CACHE.has("/favicon.ico")) {
+      const png = ICON_CACHE.get("/icon-192x192.png")
+        || { buf: fs.readFileSync(join(root, "icon-192x192.png")), contentType: "image/png" };
+      res.writeHead(200, {
+        "Content-Type": "image/png",
+        "Content-Length": png.buf.length,
+        "Cache-Control": "public, max-age=86400, immutable"
+      });
+      res.end(png.buf);
+      return;
+    }
+    // 图标优先走内存缓存 (启动前已预读)
+    if (ICON_CACHE.has(raw)) {
+      const c = ICON_CACHE.get(raw);
+      res.writeHead(200, {
+        "Content-Type": c.contentType,
+        "Content-Length": c.buf.length,
+        "Cache-Control": "public, max-age=86400, immutable"
+      });
+      res.end(c.buf);
       return;
     }
 
