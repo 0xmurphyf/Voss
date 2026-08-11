@@ -6,15 +6,13 @@ import { createHash, randomBytes } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-import { buildGateHandlers } from "./gate.mjs";
-
 const root = process.cwd();
 const port = Number.parseInt(process.env.PORT || "4173", 10);
+const voxxstakeApi = (process.env.VOXXSTAKE_API_URL || "https://voxxinc.xyz/api").replace(/\/$/, "");
 const publicOrigin = (process.env.PUBLIC_ORIGIN || "https://voss.voxxinc.xyz").replace(/\/$/, "");
 const rateBuckets = new Map();
 let pool = null;
 let attemptsReady = Promise.resolve();
-let gate = null;
 
 if (process.env.DATABASE_URL) {
   const { Pool } = await import("pg");
@@ -65,31 +63,13 @@ if (process.env.DATABASE_URL) {
     );
     ALTER TABLE voss_share_cards ADD COLUMN IF NOT EXISTS preview_image BYTEA;
     ALTER TABLE voss_share_cards ADD COLUMN IF NOT EXISTS object_id TEXT;
-    CREATE INDEX IF NOT EXISTS voss_share_cards_object_created_idx ON voss_share_cards(object_id, created_at);
-    CREATE TABLE IF NOT EXISTS voss_gate_nonces (
-      address TEXT PRIMARY KEY,
-      nonce TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      used BOOLEAN NOT NULL DEFAULT FALSE
-    );
-    CREATE INDEX IF NOT EXISTS voss_gate_nonces_created_idx ON voss_gate_nonces(created_at)
+    CREATE INDEX IF NOT EXISTS voss_share_cards_object_created_idx ON voss_share_cards(object_id, created_at)
   `);
   attemptsReady.then(() => cleanupExpiredData()).catch(error => console.error("Initial data cleanup failed:", error));
   const cleanupTimer = setInterval(() => {
     cleanupExpiredData().catch(error => console.error("Scheduled data cleanup failed:", error));
   }, 6 * 60 * 60_000);
   cleanupTimer.unref();
-}
-
-// Self-contained wallet gate (nonce/verify/scan) — replaces proxy to voxxstake.
-if (pool && process.env.JWT_SECRET) {
-  try {
-    gate = buildGateHandlers(pool, process.env.JWT_SECRET);
-  } catch (err) {
-    console.error("Failed to initialize voss gate:", err);
-  }
-} else if (pool && !process.env.JWT_SECRET) {
-  console.warn("⚠️  JWT_SECRET not set — voss wallet gate disabled. Set JWT_SECRET to enable auth.");
 }
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -258,6 +238,30 @@ async function fetchPublicImage(value, maxBytes) {
   throw new Error("NFT image is unavailable");
 }
 
+async function proxyVoxxstake(path, body, authorization) {
+  const response = await fetch(`${voxxstakeApi}${path}`, {
+    method: "POST",
+    signal:AbortSignal.timeout(15_000),
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      ...(authorization ? { Authorization: authorization } : {})
+    },
+    body: JSON.stringify(body || {})
+  });
+  const data = await response.json().catch(() => ({ detail: "Invalid response from ownership service" }));
+  return { status: response.status, data };
+}
+
+function nftNumber(position) {
+  const name = String(position.name || "");
+  const explicit = name.match(/#\s*0*(\d+)/);
+  if (explicit) return explicit[1];
+  const trailing = name.match(/(?:^|\D)0*(\d+)\s*$/);
+  if (trailing) return trailing[1];
+  return String(position.object_id || "").slice(-6).toUpperCase();
+}
+
 function tokenHash(value) {
   return createHash("sha256").update(String(value)).digest("hex");
 }
@@ -266,6 +270,22 @@ function requireAttemptsDatabase(res) {
   if (pool) return true;
   sendJson(res, 503, { detail:"NFT attempt database is not configured" });
   return false;
+}
+
+async function ownedNftsFromVoxxstake(authorization) {
+  const upstream = await proxyVoxxstake("/staking/sync", {}, authorization);
+  if (upstream.status >= 400) return { error:upstream };
+  const scanPartial = upstream.data.scan_partial === true;
+  const positions = Array.isArray(upstream.data.positions) ? upstream.data.positions : [];
+  const nfts = scanPartial ? [] : positions
+    .filter((position) => position && position.is_owned === true)
+    .map((position) => ({
+      objectId:position.object_id,
+      name:position.name || `VOXX #${String(position.object_id || "").slice(-6)}`,
+      imageUrl:position.image_url || null,
+      number:nftNumber(position)
+    }));
+  return { nfts, scanPartial };
 }
 
 async function lockVerifiedScan(client, scanToken, objectId) {
@@ -289,24 +309,62 @@ createServer(async (req, res) => {
 
     if (raw === "/api/gate/nonce" && req.method === "POST") {
       if (!allowRequest(req, res, "gate-nonce", 20, 60_000)) return;
-      if (!gate) { sendJson(res, 503, { detail: "Wallet gate is not configured" }); return; }
-      return gate.nonce(req, res);
+      const upstream = await proxyVoxxstake("/auth/nonce", await readJsonBody(req));
+      sendJson(res, upstream.status, upstream.data);
+      return;
     }
 
     if (raw === "/api/gate/verify" && req.method === "POST") {
       if (!allowRequest(req, res, "gate-verify", 20, 60_000)) return;
-      if (!gate) { sendJson(res, 503, { detail: "Wallet gate is not configured" }); return; }
-      return gate.verify(req, res);
+      const upstream = await proxyVoxxstake("/auth/verify", await readJsonBody(req));
+      sendJson(res, upstream.status, upstream.data);
+      return;
     }
 
     if (raw === "/api/gate/scan" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
       if (!allowRequest(req, res, "gate-scan", 12, 60_000)) return;
-      if (!gate) { sendJson(res, 503, { detail: "Wallet gate is not configured" }); return; }
-      return gate.scan(req, res);
+      const authorization = req.headers.authorization || "";
+      if (!authorization.startsWith("Bearer ")) {
+        sendJson(res, 401, { detail: "Wallet authentication required" });
+        return;
+      }
+      const ownership = await ownedNftsFromVoxxstake(authorization);
+      if (ownership.error) {
+        sendJson(res, ownership.error.status, ownership.error.data);
+        return;
+      }
+      await attemptsReady;
+      const ids = ownership.nfts.map((nft) => nft.objectId);
+      const attempts = ids.length
+        ? await pool.query(
+            "SELECT object_id, status, completed_cases FROM voss_nft_attempts WHERE object_id = ANY($1::text[])",
+            [ids]
+          )
+        : { rows:[] };
+      const attemptById = new Map(attempts.rows.map((row) => [row.object_id, row]));
+      const nfts = ownership.nfts.map((nft) => {
+        const attempt = attemptById.get(nft.objectId);
+        return {
+          ...nft,
+          attemptStatus:attempt?.status || "available",
+          completedCases:Number(attempt?.completed_cases || 0)
+        };
+      });
+      const scanToken = randomBytes(24).toString("hex");
+      await pool.query(
+        `INSERT INTO voss_verified_scans (token_hash, payload, expires_at)
+         VALUES ($1, $2::jsonb, NOW() + INTERVAL '5 minutes')`,
+        [tokenHash(scanToken), JSON.stringify({ nfts:ownership.nfts })]
+      );
+      sendJson(res, 200, {
+        nfts,
+        scanPartial:ownership.scanPartial,
+        count:nfts.length,
+        scanToken
+      });
+      return;
     }
-
-    // --- legacy proxy block removed: gate now self-contained ---
 
     if (raw === "/api/attempt/start" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
