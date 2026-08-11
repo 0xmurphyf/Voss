@@ -223,6 +223,15 @@ button.choice-btn small {
     background:#020407;
     border:1px solid #18232d;
 }
+.nft-image-placeholder {
+    width:100%;
+    aspect-ratio:1;
+    display:grid;
+    place-items:center;
+    color:#596673;
+    background:#020407;
+    border:1px solid #18232d;
+}
 .candidate-nft-label { margin-top:9px; color:#63d8ff; font-size:11px; letter-spacing:1.5px; cursor:pointer; user-select:none; }
 .case-layout.decision-recorded-layout {
     display:grid;
@@ -247,6 +256,7 @@ button.choice-btn small {
 .wallet-option { text-align:center; }
 .nft-option { position:relative; overflow:hidden; padding:6px; text-align:center; border-left:1px solid #34414d; }
 .nft-option img { width:100%; aspect-ratio:1; object-fit:cover; display:block; margin-bottom:6px; background:#020407; }
+.nft-option .nft-image-placeholder { margin-bottom:6px; }
 .nft-option.selected { border-color:#63d8ff; background:#10202a; }
 .nft-option small { overflow-wrap:anywhere; font-size:9px; line-height:1.25; margin-top:3px; }
 .nft-candidate-number { display:block; margin-top:0; color:#dce1e5; font-size:11px; font-weight:650; letter-spacing:0.08em; }
@@ -584,11 +594,61 @@ function safeImageUrl(value) {
     } catch { return ""; }
 }
 
+function nftPfpUrl(number) {
+    const value = String(number ?? "").trim();
+    if (!/^\d+$/.test(value)) return "";
+    const numeric = Number(value);
+    if (!Number.isSafeInteger(numeric) || numeric < 1 || numeric > 3000) return "";
+    return `/assets/PFP/VOXX_${String(numeric).padStart(4, "0")}.webp`;
+}
+
+function nftDisplayImageSources(nft, includeProxy = true) {
+    const local = nftPfpUrl(nft?.number);
+    const remote = safeImageUrl(nft?.imageUrl);
+    const proxy = /^0x[0-9a-fA-F]{64}$/.test(nft?.objectId || "")
+        ? `/api/nft-image/${nft.objectId}`
+        : "";
+    return [...new Set([local, remote, includeProxy ? proxy : ""].filter(Boolean))];
+}
+
+function nftCanvasImageSources(nft) {
+    const local = nftPfpUrl(nft?.number);
+    const proxy = /^0x[0-9a-fA-F]{64}$/.test(nft?.objectId || "")
+        ? `/api/nft-image/${nft.objectId}`
+        : "";
+    const remote = safeImageUrl(nft?.imageUrl);
+    return [...new Set([local, proxy, remote].filter(Boolean))];
+}
+
+function nftImageMarkup(nft, includeProxy = true) {
+    const [primary, ...fallbacks] = nftDisplayImageSources(nft, includeProxy);
+    if (!primary) return `<div class="nft-image-placeholder">NO IMAGE</div>`;
+    return `<img data-nft-image src="${escapeHTML(primary)}"${fallbacks.length ? ` data-fallback-srcs="${escapeHTML(JSON.stringify(fallbacks))}"` : ""} alt="${escapeHTML(nft?.name || "VOXX NFT")}">`;
+}
+
+document.addEventListener("error", event => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement) || !image.hasAttribute("data-nft-image")) return;
+    let fallbacks = [];
+    try { fallbacks = JSON.parse(image.dataset.fallbackSrcs || "[]"); }
+    catch (_) {}
+    const [next, ...remaining] = Array.isArray(fallbacks) ? fallbacks : [];
+    if (next) {
+        if (remaining.length) image.dataset.fallbackSrcs = JSON.stringify(remaining);
+        else image.removeAttribute("data-fallback-srcs");
+        image.src = next;
+        return;
+    }
+    const placeholder = document.createElement("div");
+    placeholder.className = "nft-image-placeholder";
+    placeholder.textContent = "NO IMAGE";
+    image.replaceWith(placeholder);
+}, true);
+
 function candidateNftHTML() {
     if (!selectedNft) return "";
-    const image = safeImageUrl(selectedNft.imageUrl);
     return `<aside class="candidate-nft" aria-label="Selected candidate NFT">
-        ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(selectedNft.name)}">` : `<div style="aspect-ratio:1;display:grid;place-items:center;color:#596673;border:1px solid #18232d;">NO IMAGE</div>`}
+        ${nftImageMarkup(selectedNft)}
         <div>
             <div class="candidate-nft-label">CANDIDATE #${escapeHTML(getPaddedNumber())}</div>
         </div>
@@ -1794,8 +1854,15 @@ function preloadEndingAssets() {
 }
 function preloadSelectedNft() {
     if (!selectedNft) return;
-    const url = /^0x[0-9a-fA-F]{64}$/.test(selectedNft.objectId || "") ? "/api/nft-image/" + selectedNft.objectId : safeImageUrl(selectedNft.imageUrl);
-    if (url) { const i = new Image(); i.crossOrigin = "anonymous"; i.src = url; }
+    const urls = nftCanvasImageSources(selectedNft);
+    const preload = index => {
+        if (index >= urls.length) return;
+        const image = new Image();
+        if (/^https?:/i.test(urls[index])) image.crossOrigin = "anonymous";
+        image.onerror = () => preload(index + 1);
+        image.src = urls[index];
+    };
+    preload(0);
 }
 
 function loadCanvasImage(src) {
@@ -1808,7 +1875,19 @@ function loadCanvasImage(src) {
         image.src = src;
     });
     __imgCache.set(src, p);
+    p.catch(() => {
+        if (__imgCache.get(src) === p) __imgCache.delete(src);
+    });
     return p;
+}
+
+async function loadCanvasImageFromSources(sources) {
+    let lastError = null;
+    for (const source of sources) {
+        try { return await loadCanvasImage(source); }
+        catch (error) { lastError = error; }
+    }
+    throw lastError || new Error("NFT image is unavailable");
 }
 
 function drawImageCoverRect(ctx, image, x, y, width, height) {
@@ -1865,9 +1944,7 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.fillRect(0, 0, cardWidth, cardHeight);
 
     const numStr = getPaddedNumber();
-    const nftImageUrl = /^0x[0-9a-fA-F]{64}$/.test(selectedNft?.objectId || "")
-        ? `/api/nft-image/${selectedNft.objectId}`
-        : safeImageUrl(selectedNft?.imageUrl);
+    const nftImageUrls = nftCanvasImageSources(selectedNft);
 
     // Border
     ctx.strokeStyle = "#18232d";
@@ -1898,9 +1975,9 @@ async function createShareCardImage(outcome, epilogueText) {
     ctx.stroke();
 
     // Selected candidate NFT at its original display size, rendered at 2x output resolution.
-    if (nftImageUrl) {
+    if (nftImageUrls.length) {
         try {
-            const nftImage = await loadCanvasImage(nftImageUrl);
+            const nftImage = await loadCanvasImageFromSources(nftImageUrls);
             const nftX = 526;
             const nftY = 132;
             const nftSize = 146;
@@ -2115,7 +2192,6 @@ async function boot(){
         }
         setStatus(`OWNERSHIP VERIFIED. SELECT ONE OF ${scan.nfts.length} NFT${scan.nfts.length === 1 ? "" : "S"} AS YOUR CANDIDATE.`);
         selection.innerHTML = `<div class="gate-actions" id="gateActions"></div><div class="nft-selector">${scan.nfts.map((nft, index) => {
-            const image = safeImageUrl(nft.imageUrl);
             const attemptLabel = nft.attemptStatus === "completed"
                 ? "COMPLETED — NO ATTEMPTS REMAINING"
                 : nft.attemptStatus === "started"
@@ -2123,7 +2199,7 @@ async function boot(){
                     : "ONE ATTEMPT AVAILABLE";
             const attemptUsed = nft.attemptStatus === "completed";
             return `<button class="nft-option${attemptUsed ? " attempt-used" : ""}" data-nft-index="${index}">
-                ${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(nft.name)}">` : `<div style="aspect-ratio:1;display:grid;place-items:center;color:#596673;">NO IMAGE</div>`}
+                ${nftImageMarkup(nft, false)}
                 ${attemptUsed ? `<span class="attempt-seal"><b>VOSS</b><em>ATTEMPT USED</em></span>` : ""}
                 <span class="nft-candidate-number candidate-nft-label">CANDIDATE #${escapeHTML(nft.number)}</span>
                 <small>${attemptLabel}</small>
@@ -2151,6 +2227,7 @@ async function boot(){
                     continueBtn.textContent = "RESTORING RECORDED PROGRESS...";
                     try {
                         await resumeNftAttempt();
+                        preloadSelectedNft();
                         playBeep(720, 60);
                         render();
                     } catch (error) {
@@ -2165,6 +2242,7 @@ async function boot(){
                     beginBtn.textContent = "RESERVING NFT ATTEMPT...";
                     try {
                         await startNftAttempt();
+                        preloadSelectedNft();
                         clearSave();
                         resetState();
                         isTestMode = false;
@@ -2202,7 +2280,6 @@ async function boot(){
                     const scan = await connectAndScan(wallets[Number(button.dataset.walletIndex)], setStatus);
                     showDisconnect();
                     showNfts(scan);
-                    setTimeout(preloadSelectedNft, 0);
                 } catch (error) {
                     setStatus(`VERIFICATION FAILED: ${error.message || "UNKNOWN ERROR"}`);
                     if (connectedWallet) showDisconnect();

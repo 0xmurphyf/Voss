@@ -51,3 +51,12 @@ test("Slush app icon discovery metadata and fallbacks remain deployable", () => 
     ["/icon-192x192.png?v=20260811", "/icon-512x512.png?v=20260811"]
   );
 });
+
+test("NFT numbers map to local PFP images with safe fallbacks", () => {
+  assert.match(page, /function nftPfpUrl\(number\)/);
+  assert.match(page, /\/assets\/PFP\/VOXX_\$\{String\(numeric\)\.padStart\(4, "0"\)\}\.webp/);
+  assert.match(page, /data-fallback-srcs/);
+  assert.match(page, /function nftCanvasImageSources\(nft\)/);
+  assert.match(page, /loadCanvasImageFromSources\(nftImageUrls\)/);
+  assert.match(page, /if \(__imgCache\.get\(src\) === p\) __imgCache\.delete\(src\)/);
+});
