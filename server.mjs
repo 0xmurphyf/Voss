@@ -74,12 +74,14 @@ const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".ico": "image/x-icon",
   ".png": "image/png",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json; charset=utf-8",
   ".mp4": "video/mp4"
 };
+const cacheableStaticTypes = new Set([".ico", ".png", ".webp", ".svg", ".webmanifest"]);
 
 async function readJsonBody(req, maxSize = 64 * 1024) {
   const chunks = [];
@@ -741,7 +743,8 @@ a:hover{background:#10202a;color:#fff}
     const info = await stat(path);
     if (!info.isFile()) throw new Error("not a file");
 
-    const contentType = types[extname(path)] || "application/octet-stream";
+    const extension = extname(path);
+    const contentType = types[extension] || "application/octet-stream";
     const range = req.headers.range;
 
     if (range && contentType === "video/mp4") {
@@ -773,6 +776,8 @@ a:hover{background:#10202a;color:#fff}
       "Content-Type": contentType,
       "Cache-Control": contentType === "video/mp4"
         ? "public, max-age=86400"
+        : cacheableStaticTypes.has(extension)
+          ? "public, max-age=86400, stale-while-revalidate=604800"
         : "no-store"
     });
     res.end(body);

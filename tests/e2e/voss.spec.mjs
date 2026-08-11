@@ -35,6 +35,22 @@ async function mockApis(page) {
   await page.route("**/api/share-card", route => route.fulfill({ status:201, json:{ url:"/share/test" } }));
 }
 
+test("Slush icon endpoints expose crawler-compatible headers", async ({ request }) => {
+  const assets = [
+    ["/favicon.ico?v=20260811", "image/x-icon"],
+    ["/icon-192x192.png?v=20260811", "image/png"],
+    ["/site.webmanifest", "application/manifest+json"]
+  ];
+
+  for (const [url, contentType] of assets) {
+    const response = await request.get(url);
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()["content-type"]).toContain(contentType);
+    expect(response.headers()["cache-control"]).toContain("public, max-age=86400");
+    expect(response.headers()["cache-control"]).not.toContain("no-store");
+  }
+});
+
 test("wallet gate, NFT start and first decision work", async ({ page }) => {
   await mockWallet(page);
   await mockApis(page);
