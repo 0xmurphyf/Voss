@@ -167,6 +167,25 @@ async function assertPublicImageUrl(value) {
   return url;
 }
 
+const NFT_CACHE_DIR = "/app/assets/nft-cache";
+try { fs.mkdirSync(NFT_CACHE_DIR, { recursive: true }); } catch (_) {}
+function nftCachePath(objectId) { return path.join(NFT_CACHE_DIR, objectId + ".bin"); }
+function nftCacheRead(objectId) {
+  try {
+    const buf = fs.readFileSync(nftCachePath(objectId));
+    const idx = buf.indexOf(0x00);
+    if (idx < 0) return null;
+    const contentType = buf.subarray(0, idx).toString("utf8");
+    return { image: buf.subarray(idx + 1), contentType };
+  } catch (_) { return null; }
+}
+function nftCacheWrite(objectId, contentType, image) {
+  try {
+    const head = Buffer.from(contentType + "\0", "utf8");
+    fs.writeFileSync(nftCachePath(objectId), Buffer.concat([head, image]));
+  } catch (_) {}
+}
+
 async function fetchPublicImage(value, maxBytes) {
   let current = await assertPublicImageUrl(value);
   for (let redirects = 0; redirects <= 3; redirects++) {
@@ -437,8 +456,20 @@ createServer(async (req, res) => {
         sendJson(res, 404, { detail:"NFT image is unavailable" });
         return;
       }
+      const cached = nftCacheRead(nftImageMatch[1]);
+      if (cached) {
+        res.writeHead(200, {
+          "Content-Type":cached.contentType,
+          "Content-Length":cached.image.length,
+          "Cache-Control":"public, max-age=31536000, immutable",
+          "X-Cache":"HIT"
+        });
+        res.end(cached.image);
+        return;
+      }
       try {
         const { image, contentType } = await fetchPublicImage(imageUrl, 12 * 1024 * 1024);
+        nftCacheWrite(nftImageMatch[1], contentType, image);
         res.writeHead(200, {
           "Content-Type":contentType,
           "Content-Length":image.length,
