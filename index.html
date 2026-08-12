@@ -2227,7 +2227,7 @@ async function boot(){
             if (r.status !== 200 || d.detail) {
                 nftCheckResult.innerHTML = `<span class="red">LOOKUP FAILED: ${escapeHTML(d.detail || "UNKNOWN ERROR")}</span>`;
             } else if (d.status === "not_eligible") {
-                nftCheckResult.innerHTML = `<span class="red">CANDIDATE #${escapeHTML(d.number || q)} → NOT ELIGIBLE (NO CANDIDATE IMAGE)</span>`;
+                nftCheckResult.innerHTML = `<span class="red">CANDIDATE #${escapeHTML(d.number || q)} → NOT ELIGIBLE</span>`;
             } else if (!d.found) {
                 nftCheckResult.innerHTML = `<span class="green">CANDIDATE ${escapeHTML(q)} → AVAILABLE (NO ATTEMPT RECORDED)</span>`;
             } else {
