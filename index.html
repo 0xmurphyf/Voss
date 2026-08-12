@@ -2226,8 +2226,10 @@ async function boot(){
             const d = await r.json().catch(() => ({}));
             if (r.status !== 200 || d.detail) {
                 nftCheckResult.innerHTML = `<span class="red">LOOKUP FAILED: ${escapeHTML(d.detail || "UNKNOWN ERROR")}</span>`;
+            } else if (d.status === "not_eligible") {
+                nftCheckResult.innerHTML = `<span class="red">CANDIDATE #${escapeHTML(d.number || q)} → NOT ELIGIBLE (NO CANDIDATE IMAGE)</span>`;
             } else if (!d.found) {
-                nftCheckResult.innerHTML = `<span class="green">NFT ${escapeHTML(q)} → AVAILABLE (NO ATTEMPT RECORDED)</span>`;
+                nftCheckResult.innerHTML = `<span class="green">CANDIDATE ${escapeHTML(q)} → AVAILABLE (NO ATTEMPT RECORDED)</span>`;
             } else {
                 const statusText = d.status === "completed"
                     ? `<span class="gold">USED — ATTEMPT COMPLETED (${d.completedCases}/12)</span>`
@@ -2235,7 +2237,7 @@ async function boot(){
                         ? `<span class="red">IN PROGRESS — ${d.completedCases}/12</span>`
                         : `<span class="green">AVAILABLE</span>`;
                 const label = d.number ? `#${d.number}` : (d.objectId || q);
-                nftCheckResult.innerHTML = `NFT ${escapeHTML(label)} → ${statusText}`;
+                nftCheckResult.innerHTML = `CANDIDATE ${escapeHTML(label)} → ${statusText}`;
             }
         } catch (e) {
             nftCheckResult.innerHTML = `<span class="red">NETWORK ERROR: ${escapeHTML(e.message || "FAILED")}</span>`;

@@ -324,23 +324,40 @@ createServer(async (req, res) => {
 
     if (raw === "/api/nft-status" && req.method === "GET") {
       if (!requireAttemptsDatabase(res)) return;
-      const q = (new URL(req.url, "http://localhost").searchParams.get("q") || "").trim();
+      const rawQ = (new URL(req.url, "http://localhost").searchParams.get("q") || "").trim();
+      const q = rawQ.replace(/^#/, "");
       if (!q) {
-        sendJson(res, 400, { detail: "Missing query parameter 'q' (NFT number or objectId)" });
+        sendJson(res, 400, { detail: "Missing query parameter 'q' (candidate # or objectId)" });
         return;
       }
       await attemptsReady;
+      // 数字候选编号 -> 检查本地 PFP webp 是否存在
+      const numMatch = q.match(/^(\d+)$/);
+      if (numMatch) {
+        const numeric = Number(numMatch[1]);
+        const padded = String(numeric).padStart(4, "0");
+        if (numeric < 1 || numeric > 3000) {
+          sendJson(res, 200, { found:false, eligible:false, status:"not_eligible", number:String(numeric), reason:"candidate number out of range" });
+          return;
+        }
+        const pfp = join(root, "assets", "PFP", `VOXX_${padded}.webp`);
+        if (!fs.existsSync(pfp)) {
+          sendJson(res, 200, { found:false, eligible:false, status:"not_eligible", number:String(numeric), reason:"candidate image not found" });
+          return;
+        }
+      }
       const rows = await pool.query(
         "SELECT object_id, nft_number, status, completed_cases FROM voss_nft_attempts WHERE object_id=$1 OR nft_number=$1 ORDER BY completed_at DESC NULLS LAST, started_at DESC LIMIT 1",
         [q]
       );
       const row = rows.rows[0];
       if (!row) {
-        sendJson(res, 200, { found:false, status:"available", objectId:null, number:null, completedCases:0 });
+        sendJson(res, 200, { found:false, eligible:true, status:"available", objectId:null, number:null, completedCases:0 });
         return;
       }
       sendJson(res, 200, {
         found:true,
+        eligible:true,
         objectId:row.object_id,
         number:row.nft_number,
         status:row.status,
