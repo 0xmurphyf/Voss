@@ -2190,7 +2190,7 @@ async function boot(){
             <div class="nft-check" id="nftCheck" style="margin:14px 0 6px; border:1px solid #34414d; border-left:2px solid #63d8ff; padding:10px 12px; background:#080c11;">
                 <div style="color:#63d8ff; letter-spacing:2px; font-size:11px; margin-bottom:8px;">CHECK CANDIDATE STATUS</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <input id="nftCheckInput" type="text" placeholder="CANDIDATE # OR OBJECT ID" style="flex:1; min-width:140px; background:#020407; border:1px solid #34414d; color:#f2f5f7; padding:8px 10px; font-family:inherit; letter-spacing:1px; font-size:13px;" />
+                    <input id="nftCheckInput" type="text" placeholder="CANDIDATE #" style="flex:1; min-width:140px; background:#020407; border:1px solid #34414d; color:#f2f5f7; padding:8px 10px; font-family:inherit; letter-spacing:1px; font-size:13px;" />
                     <button id="nftCheckBtn" style="text-align:center; white-space:nowrap;">CHECK</button>
                 </div>
                 <div id="nftCheckResult" style="margin-top:8px; font-size:13px; letter-spacing:0.5px; min-height:18px;"></div>
@@ -2218,7 +2218,7 @@ async function boot(){
     const nftCheckResult = document.getElementById("nftCheckResult");
     const runNftCheck = async () => {
         const q = (nftCheckInput.value || "").trim();
-        if (!q) { nftCheckResult.innerHTML = `<span class="dim">ENTER A CANDIDATE # OR OBJECT ID.</span>`; return; }
+        if (!q) { nftCheckResult.innerHTML = `<span class="dim">ENTER A CANDIDATE #.</span>`; return; }
         nftCheckBtn.disabled = true;
         nftCheckResult.innerHTML = `<span class="dim">CHECKING…</span>`;
         try {
@@ -2313,16 +2313,27 @@ async function boot(){
                         actions.innerHTML = `<div class="gate-status">FINAL ALREADY RECORDED. THIS NFT HAS NO ATTEMPTS REMAINING.</div>
                             <div class="used-nft-result">
                                 <div class="used-nft-result-label">CHECK THE TEST RESULT</div>
-                                <div id="shareCardLink" class="used-nft-result-link">LOADING SHARE CARD...</div>
+                                <button id="checkResultBtn" style="text-align:center;">CHECK TEST RESULT</button>
+                                <div id="shareCardLink" class="used-nft-result-link"></div>
                             </div>`;
-                        const linkEl = actions.querySelector("#shareCardLink");
-                        apiJson(`/api/share-card/latest?objectId=${encodeURIComponent(nft.objectId || "")}`)
-                            .then(card => {
-                                linkEl.innerHTML = `<a href="${escapeHTML(card.url)}" target="_blank" rel="noopener">VIEW LATEST SHARE CARD →</a>`;
-                            })
-                            .catch(() => {
-                                linkEl.textContent = "NO SHARE CARD PUBLISHED YET";
-                            });
+                        const checkBtn = document.getElementById("checkResultBtn");
+                        const linkEl = document.getElementById("shareCardLink");
+                        checkBtn.onclick = () => {
+                            checkBtn.disabled = true;
+                            checkBtn.textContent = "CHECKING...";
+                            linkEl.textContent = "";
+                            apiJson(`/api/share-card/latest?objectId=${encodeURIComponent(nft.objectId || "")}`)
+                                .then(card => {
+                                    linkEl.innerHTML = `<a href="${escapeHTML(card.url)}" target="_blank" rel="noopener">VIEW LATEST SHARE CARD →</a>`;
+                                    checkBtn.textContent = "CHECK TEST RESULT";
+                                    checkBtn.disabled = false;
+                                })
+                                .catch(() => {
+                                    linkEl.textContent = "NO SHARE CARD PUBLISHED YET";
+                                    checkBtn.textContent = "CHECK TEST RESULT";
+                                    checkBtn.disabled = false;
+                                });
+                        };
                         return;
                     }
                     actions.innerHTML = nft.attemptStatus === "started"

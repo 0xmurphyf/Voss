@@ -331,7 +331,6 @@ createServer(async (req, res) => {
         return;
       }
       await attemptsReady;
-      // 数字候选编号 -> 检查本地 PFP webp 是否存在
       const numMatch = q.match(/^(\d+)$/);
       if (numMatch) {
         const numeric = Number(numMatch[1]);
@@ -345,6 +344,10 @@ createServer(async (req, res) => {
           sendJson(res, 200, { found:false, eligible:false, status:"not_eligible", number:String(numeric), reason:"candidate image not found" });
           return;
         }
+      } else {
+        // 非数字输入(字母/任意字符)无法对应任何候选图片
+        sendJson(res, 200, { found:false, eligible:false, status:"not_eligible", number:null, reason:"not a candidate number" });
+        return;
       }
       const rows = await pool.query(
         "SELECT object_id, nft_number, status, completed_cases FROM voss_nft_attempts WHERE object_id=$1 OR nft_number=$1 ORDER BY completed_at DESC NULLS LAST, started_at DESC LIMIT 1",
