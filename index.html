@@ -271,6 +271,11 @@ button.choice-btn small {
 .nft-sort-btn.active { background:#10202a; border-color:#63d8ff; color:#63d8ff; }
 .nft-filter-count { margin-left:8px; color:#5a6772; font-size:10.5px; letter-spacing:1px; }
 .nft-empty { color:#888; padding:18px; text-align:center; letter-spacing:1px; }
+.used-nft-result { margin-top:12px; padding:12px; border:1px solid #34414d; border-radius:6px; background:#0a121a; text-align:center; }
+.used-nft-result-label { color:#63d8ff; letter-spacing:2px; font-size:11px; margin-bottom:8px; }
+.used-nft-result-link { font-size:12px; letter-spacing:1px; }
+.used-nft-result-link a { color:#9fd8ff; text-decoration:none; border-bottom:1px solid #63d8ff55; padding-bottom:1px; }
+.used-nft-result-link a:hover { color:#63d8ff; }
 .attempt-seal {
     position:absolute;
     top:15px;
@@ -2262,7 +2267,19 @@ async function boot(){
                     testShortcutClicks = 0;
                     const actions = document.getElementById("gateActions");
                     if (nft.attemptStatus === "completed") {
-                        actions.innerHTML = `<div class="gate-status">FINAL ALREADY RECORDED. THIS NFT HAS NO ATTEMPTS REMAINING.</div>`;
+                        actions.innerHTML = `<div class="gate-status">FINAL ALREADY RECORDED. THIS NFT HAS NO ATTEMPTS REMAINING.</div>
+                            <div class="used-nft-result">
+                                <div class="used-nft-result-label">CHECK THE TEST RESULT</div>
+                                <div id="shareCardLink" class="used-nft-result-link">LOADING SHARE CARD...</div>
+                            </div>`;
+                        const linkEl = actions.querySelector("#shareCardLink");
+                        apiJson(`/api/share-card/latest?objectId=${encodeURIComponent(nft.objectId || "")}`)
+                            .then(card => {
+                                linkEl.innerHTML = `<a href="${escapeHTML(card.url)}" target="_blank" rel="noopener">VIEW LATEST SHARE CARD →</a>`;
+                            })
+                            .catch(() => {
+                                linkEl.textContent = "NO SHARE CARD PUBLISHED YET";
+                            });
                         return;
                     }
                     actions.innerHTML = nft.attemptStatus === "started"

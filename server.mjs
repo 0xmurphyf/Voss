@@ -496,6 +496,32 @@ createServer(async (req, res) => {
       return;
     }
 
+    if (raw === "/api/share-card/latest" && req.method === "GET") {
+      if (!requireAttemptsDatabase(res)) return;
+      const objectId = String(req.query?.objectId || req.url.split("objectId=")[1] || "");
+      if (!objectId) {
+        sendJson(res, 400, { detail: "objectId is required" });
+        return;
+      }
+      await attemptsReady;
+      const result = await pool.query(
+        "SELECT id, created_at FROM voss_share_cards WHERE object_id=$1 ORDER BY created_at DESC LIMIT 1",
+        [objectId]
+      );
+      if (!result.rowCount) {
+        sendJson(res, 404, { detail: "No share card found for this NFT" });
+        return;
+      }
+      const id = result.rows[0].id;
+      sendJson(res, 200, {
+        url: `${publicOrigin}/share/${id}`,
+        imageUrl: `${publicOrigin}/share/${id}.png`,
+        previewUrl: `${publicOrigin}/share/${id}-preview.png`,
+        createdAt: result.rows[0].created_at
+      });
+      return;
+    }
+
     if (raw === "/api/share-card" && req.method === "POST") {
       if (!requireAttemptsDatabase(res)) return;
       if (!allowRequest(req, res, "share-card", 6, 60 * 60_000)) return;
