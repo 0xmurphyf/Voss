@@ -2187,6 +2187,14 @@ async function boot(){
             <h2 id="preWalletShortcut" style="margin-bottom:6px;cursor:default;user-select:none;">VOSS PROTOCOL</h2>
             <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:20px;">NFT-RESTRICTED EXECUTIVE SELECTION SYSTEM</div>
             <div class="gate-status" id="gateStatus">CONNECT A SUI WALLET TO VERIFY VOXX OWNERSHIP.</div>
+            <div class="nft-check" id="nftCheck" style="margin:14px 0 6px; border:1px solid #34414d; border-left:2px solid #63d8ff; padding:10px 12px; background:#080c11;">
+                <div style="color:#63d8ff; letter-spacing:2px; font-size:11px; margin-bottom:8px;">CHECK NFT STATUS</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <input id="nftCheckInput" type="text" placeholder="NFT # OR OBJECT ID" style="flex:1; min-width:140px; background:#020407; border:1px solid #34414d; color:#f2f5f7; padding:8px 10px; font-family:inherit; letter-spacing:1px; font-size:13px;" />
+                    <button id="nftCheckBtn" style="text-align:center; white-space:nowrap;">CHECK</button>
+                </div>
+                <div id="nftCheckResult" style="margin-top:8px; font-size:13px; letter-spacing:0.5px; min-height:18px;"></div>
+            </div>
             <button id="findWalletsBtn" style="text-align:center;">CONNECT SUI WALLET</button>
             <button id="disconnectWalletBtn" style="text-align:center;" hidden>DISCONNECT WALLET</button>
             <div class="wallet-list" id="walletList"></div>
@@ -2204,6 +2212,39 @@ async function boot(){
         findWalletsBtn.hidden = true;
         disconnectWalletBtn.hidden = false;
     };
+
+    const nftCheckInput = document.getElementById("nftCheckInput");
+    const nftCheckBtn = document.getElementById("nftCheckBtn");
+    const nftCheckResult = document.getElementById("nftCheckResult");
+    const runNftCheck = async () => {
+        const q = (nftCheckInput.value || "").trim();
+        if (!q) { nftCheckResult.innerHTML = `<span class="dim">ENTER AN NFT # OR OBJECT ID.</span>`; return; }
+        nftCheckBtn.disabled = true;
+        nftCheckResult.innerHTML = `<span class="dim">CHECKING…</span>`;
+        try {
+            const r = await fetch(`/api/nft-status?q=${encodeURIComponent(q)}`);
+            const d = await r.json().catch(() => ({}));
+            if (r.status !== 200 || d.detail) {
+                nftCheckResult.innerHTML = `<span class="red">LOOKUP FAILED: ${escapeHTML(d.detail || "UNKNOWN ERROR")}</span>`;
+            } else if (!d.found) {
+                nftCheckResult.innerHTML = `<span class="green">NFT ${escapeHTML(q)} → AVAILABLE (NO ATTEMPT RECORDED)</span>`;
+            } else {
+                const statusText = d.status === "completed"
+                    ? `<span class="gold">USED — ATTEMPT COMPLETED (${d.completedCases}/12)</span>`
+                    : d.status === "started"
+                        ? `<span class="red">IN PROGRESS — ${d.completedCases}/12</span>`
+                        : `<span class="green">AVAILABLE</span>`;
+                const label = d.number ? `#${d.number}` : (d.objectId || q);
+                nftCheckResult.innerHTML = `NFT ${escapeHTML(label)} → ${statusText}`;
+            }
+        } catch (e) {
+            nftCheckResult.innerHTML = `<span class="red">NETWORK ERROR: ${escapeHTML(e.message || "FAILED")}</span>`;
+        } finally {
+            nftCheckBtn.disabled = false;
+        }
+    };
+    nftCheckBtn.addEventListener("click", runNftCheck);
+    nftCheckInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); runNftCheck(); } });
 
     const showNfts = scan => {
         activeScanToken = scan.scanToken || null;
