@@ -1794,11 +1794,19 @@ document.addEventListener("keydown", (e) => {
         }
     }
 
-    if (e.key === "Enter" && pendingChoice && !submitted) {
-        e.preventDefault();
-        const submitBtn = document.getElementById("submitBtn");
-        if (submitBtn && !submitBtn.disabled) {
-            submitBtn.click();
+    if (e.key === "Enter") {
+        const nextBtn = document.getElementById("nextBtn");
+        if (nextBtn) {
+            e.preventDefault();
+            nextBtn.click();
+            return;
+        }
+        if (pendingChoice && !submitted) {
+            e.preventDefault();
+            const submitBtn = document.getElementById("submitBtn");
+            if (submitBtn && !submitBtn.disabled) {
+                submitBtn.click();
+            }
         }
     }
 });
