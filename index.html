@@ -2012,7 +2012,7 @@ async function createShareCardImage(outcome, epilogueText) {
             ctx.fillStyle = "#aeb7c0";
             ctx.font = "10px 'Space Mono', monospace";
             ctx.textAlign = "right";
-            ctx.fillText(`NFT #${numStr}`, nftX + nftSize, nftY + nftSize + 16);
+            ctx.fillText(`CANDIDATE #${numStr}`, nftX + nftSize, nftY + nftSize + 16);
             ctx.textAlign = "left";
         } catch (_) {}
     }
@@ -2188,9 +2188,9 @@ async function boot(){
             <div style="color:#888; letter-spacing:2px; font-size:12px; margin-bottom:20px;">NFT-RESTRICTED EXECUTIVE SELECTION SYSTEM</div>
             <div class="gate-status" id="gateStatus">CONNECT A SUI WALLET TO VERIFY VOXX OWNERSHIP.</div>
             <div class="nft-check" id="nftCheck" style="margin:14px 0 6px; border:1px solid #34414d; border-left:2px solid #63d8ff; padding:10px 12px; background:#080c11;">
-                <div style="color:#63d8ff; letter-spacing:2px; font-size:11px; margin-bottom:8px;">CHECK NFT STATUS</div>
+                <div style="color:#63d8ff; letter-spacing:2px; font-size:11px; margin-bottom:8px;">CHECK CANDIDATE STATUS</div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <input id="nftCheckInput" type="text" placeholder="NFT # OR OBJECT ID" style="flex:1; min-width:140px; background:#020407; border:1px solid #34414d; color:#f2f5f7; padding:8px 10px; font-family:inherit; letter-spacing:1px; font-size:13px;" />
+                    <input id="nftCheckInput" type="text" placeholder="CANDIDATE # OR OBJECT ID" style="flex:1; min-width:140px; background:#020407; border:1px solid #34414d; color:#f2f5f7; padding:8px 10px; font-family:inherit; letter-spacing:1px; font-size:13px;" />
                     <button id="nftCheckBtn" style="text-align:center; white-space:nowrap;">CHECK</button>
                 </div>
                 <div id="nftCheckResult" style="margin-top:8px; font-size:13px; letter-spacing:0.5px; min-height:18px;"></div>
@@ -2218,7 +2218,7 @@ async function boot(){
     const nftCheckResult = document.getElementById("nftCheckResult");
     const runNftCheck = async () => {
         const q = (nftCheckInput.value || "").trim();
-        if (!q) { nftCheckResult.innerHTML = `<span class="dim">ENTER AN NFT # OR OBJECT ID.</span>`; return; }
+        if (!q) { nftCheckResult.innerHTML = `<span class="dim">ENTER A CANDIDATE # OR OBJECT ID.</span>`; return; }
         nftCheckBtn.disabled = true;
         nftCheckResult.innerHTML = `<span class="dim">CHECKING…</span>`;
         try {
