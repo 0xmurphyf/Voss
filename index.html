@@ -2229,7 +2229,7 @@ async function boot(){
             } else if (d.status === "not_eligible") {
                 nftCheckResult.innerHTML = `<span class="red">CANDIDATE #${escapeHTML(d.number || q)} → NOT ELIGIBLE</span>`;
             } else if (!d.found) {
-                nftCheckResult.innerHTML = `<span class="green">CANDIDATE ${escapeHTML(q)} → AVAILABLE (NO ATTEMPT RECORDED)</span>`;
+                nftCheckResult.innerHTML = `<span class="green">CANDIDATE ${escapeHTML(q)} → AVAILABLE</span>`;
             } else {
                 const statusText = d.status === "completed"
                     ? `<span class="gold">USED — ATTEMPT COMPLETED (${d.completedCases}/12)</span>`
