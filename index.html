@@ -262,14 +262,14 @@ button.choice-btn small {
 .nft-option small { overflow-wrap:anywhere; font-size:9px; line-height:1.25; margin-top:3px; }
 .nft-candidate-number { display:block; margin-top:0; color:#dce1e5; font-size:11px; font-weight:650; letter-spacing:0.08em; }
 .nft-toolbar { margin:10px 0 4px; display:flex; flex-direction:column; gap:8px; }
-.nft-search { width:100%; box-sizing:border-box; background:#020407; border:1px solid #34414d; color:#dce1e5; padding:9px 11px; font-size:12px; letter-spacing:1px; border-radius:4px; outline:none; }
-.nft-search::placeholder { color:#5a6772; letter-spacing:1px; }
-.nft-search:focus { border-color:#63d8ff; }
 .nft-filters { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .nft-filter-btn { background:#0c1620; border:1px solid #34414d; color:#9fb0bd; padding:6px 12px; font-size:10.5px; letter-spacing:1.5px; border-radius:4px; cursor:pointer; transition:all .12s ease; }
 .nft-filter-btn:hover { border-color:#4a5a68; color:#dce1e5; }
 .nft-filter-btn.active { background:#10202a; border-color:#63d8ff; color:#63d8ff; }
-.nft-filter-count { margin-left:auto; color:#5a6772; font-size:10.5px; letter-spacing:1px; }
+.nft-sort-btn { background:#0c1620; border:1px solid #34414d; color:#9fb0bd; padding:6px 12px; font-size:10.5px; letter-spacing:1.5px; border-radius:4px; cursor:pointer; transition:all .12s ease; margin-left:auto; }
+.nft-sort-btn:hover { border-color:#4a5a68; color:#dce1e5; }
+.nft-sort-btn.active { background:#10202a; border-color:#63d8ff; color:#63d8ff; }
+.nft-filter-count { margin-left:8px; color:#5a6772; font-size:10.5px; letter-spacing:1px; }
 .nft-empty { color:#888; padding:18px; text-align:center; letter-spacing:1px; }
 .attempt-seal {
     position:absolute;
@@ -2203,7 +2203,7 @@ async function boot(){
         }
         const originalNfts = scan.nfts;
         let activeFilter = "all";
-        let searchTerm = "";
+        let sortDir = "asc";
 
         const matchesFilter = nft => {
             if (activeFilter === "all") return true;
@@ -2212,14 +2212,15 @@ async function boot(){
             if (activeFilter === "used") return (nft.attemptStatus || "available") === "completed";
             return true;
         };
-        const matchesSearch = nft => {
-            if (!searchTerm) return true;
-            const q = searchTerm.toLowerCase();
-            const num = String(nft.number ?? "").toLowerCase();
-            const oid = String(nft.objectId ?? "").toLowerCase();
-            return num.includes(q) || oid.includes(q);
-        };
-        const getFiltered = () => originalNfts.filter(n => matchesFilter(n) && matchesSearch(n));
+        const numOf = nft => { const x = Number(nft.number); return Number.isFinite(x) ? x : NaN; };
+        const sortNfts = list => [...list].sort((a, b) => {
+            const na = numOf(a), nb = numOf(b);
+            const cmp = (Number.isFinite(na) && Number.isFinite(nb))
+                ? na - nb
+                : String(a.number ?? "").localeCompare(String(b.number ?? ""), undefined, { numeric: true });
+            return sortDir === "asc" ? cmp : -cmp;
+        });
+        const getFiltered = () => sortNfts(originalNfts.filter(n => matchesFilter(n)));
 
         const renderList = nfts => {
             const selector = selection.querySelector(".nft-selector");
@@ -2312,29 +2313,33 @@ async function boot(){
             applyFilters();
         };
 
+        const toggleSort = () => {
+            sortDir = sortDir === "asc" ? "desc" : "asc";
+            const sortBtn = selection.querySelector("#nftSort");
+            if (sortBtn) sortBtn.textContent = sortDir === "asc" ? "SORT: # LOW→HIGH" : "SORT: # HIGH→LOW";
+            applyFilters();
+        };
+
         setStatus(`OWNERSHIP VERIFIED. SELECT ONE OF ${scan.nfts.length} NFT${scan.nfts.length === 1 ? "" : "S"} AS YOUR CANDIDATE.`);
         selection.innerHTML = `
             <div class="nft-toolbar">
-                <input id="nftSearch" class="nft-search" type="text" placeholder="SEARCH CANDIDATE # OR OBJECT ID..." autocomplete="off" />
                 <div class="nft-filters">
                     <button class="nft-filter-btn active" data-filter="all">ALL</button>
                     <button class="nft-filter-btn" data-filter="available">AVAILABLE</button>
                     <button class="nft-filter-btn" data-filter="inprogress">IN PROGRESS</button>
                     <button class="nft-filter-btn" data-filter="used">USED</button>
+                    <button class="nft-sort-btn active" id="nftSort" data-sort="asc">SORT: # LOW→HIGH</button>
                     <span id="nftFilterCount" class="nft-filter-count"></span>
                 </div>
             </div>
             <div class="gate-actions" id="gateActions"></div>
             <div class="nft-selector"></div>`;
 
-        const searchInput = selection.querySelector("#nftSearch");
-        searchInput.addEventListener("input", e => {
-            searchTerm = e.target.value.trim();
-            applyFilters();
-        });
         selection.querySelectorAll(".nft-filter-btn").forEach(btn => {
             btn.onclick = () => setFilter(btn.dataset.filter);
         });
+        const sortBtn = selection.querySelector("#nftSort");
+        if (sortBtn) sortBtn.onclick = toggleSort;
 
         applyFilters();
     };
