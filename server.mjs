@@ -80,7 +80,8 @@ const types = {
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".webmanifest": "application/manifest+json; charset=utf-8",
-  ".mp4": "video/mp4"
+  ".mp4": "video/mp4",
+  ".txt": "text/plain; charset=utf-8"
 };
 
 // 启动前预读常用图标进内存 (types 已定义)
@@ -775,8 +776,24 @@ a:hover{background:#10202a;color:#fff}
     const path = normalize(join(root, relative));
     if (!path.startsWith(root)) throw new Error("invalid path");
 
-    const info = await stat(path);
-    if (!info.isFile()) throw new Error("not a file");
+    let info = null;
+    try {
+      info = await stat(path);
+    } catch {
+      info = null;
+    }
+    // SPA fallback: 非 /api/ 的未知前端路由回退到 index.html(让前端路由处理)
+    if (!info || !info.isFile()) {
+      if (requestedPath.startsWith("/api/")) throw new Error("not a file");
+      const body = await readFile(normalize(join(root, "index.html")));
+      res.writeHead(200, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Content-Length": body.length,
+        "Cache-Control": "no-store"
+      });
+      res.end(body);
+      return;
+    }
 
     const extension = extname(path);
     const contentType = types[extension] || "application/octet-stream";
