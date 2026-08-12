@@ -324,7 +324,7 @@ createServer(async (req, res) => {
 
     if (raw === "/api/nft-status" && req.method === "GET") {
       if (!requireAttemptsDatabase(res)) return;
-      const q = (url.searchParams.get("q") || "").trim();
+      const q = (new URL(req.url, "http://localhost").searchParams.get("q") || "").trim();
       if (!q) {
         sendJson(res, 400, { detail: "Missing query parameter 'q' (NFT number or objectId)" });
         return;
