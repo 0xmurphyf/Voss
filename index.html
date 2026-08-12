@@ -261,6 +261,16 @@ button.choice-btn small {
 .nft-option.selected { border-color:#63d8ff; background:#10202a; }
 .nft-option small { overflow-wrap:anywhere; font-size:9px; line-height:1.25; margin-top:3px; }
 .nft-candidate-number { display:block; margin-top:0; color:#dce1e5; font-size:11px; font-weight:650; letter-spacing:0.08em; }
+.nft-toolbar { margin:10px 0 4px; display:flex; flex-direction:column; gap:8px; }
+.nft-search { width:100%; box-sizing:border-box; background:#020407; border:1px solid #34414d; color:#dce1e5; padding:9px 11px; font-size:12px; letter-spacing:1px; border-radius:4px; outline:none; }
+.nft-search::placeholder { color:#5a6772; letter-spacing:1px; }
+.nft-search:focus { border-color:#63d8ff; }
+.nft-filters { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.nft-filter-btn { background:#0c1620; border:1px solid #34414d; color:#9fb0bd; padding:6px 12px; font-size:10.5px; letter-spacing:1.5px; border-radius:4px; cursor:pointer; transition:all .12s ease; }
+.nft-filter-btn:hover { border-color:#4a5a68; color:#dce1e5; }
+.nft-filter-btn.active { background:#10202a; border-color:#63d8ff; color:#63d8ff; }
+.nft-filter-count { margin-left:auto; color:#5a6772; font-size:10.5px; letter-spacing:1px; }
+.nft-empty { color:#888; padding:18px; text-align:center; letter-spacing:1px; }
 .attempt-seal {
     position:absolute;
     top:15px;
@@ -2191,73 +2201,142 @@ async function boot(){
                 : "ACCESS DENIED. THIS WALLET DOES NOT HOLD AN ELIGIBLE VOXX NFT.");
             return;
         }
-        setStatus(`OWNERSHIP VERIFIED. SELECT ONE OF ${scan.nfts.length} NFT${scan.nfts.length === 1 ? "" : "S"} AS YOUR CANDIDATE.`);
-        selection.innerHTML = `<div class="gate-actions" id="gateActions"></div><div class="nft-selector">${scan.nfts.map((nft, index) => {
-            const attemptLabel = nft.attemptStatus === "completed"
-                ? "COMPLETED — NO ATTEMPTS REMAINING"
-                : nft.attemptStatus === "started"
-                    ? `IN PROGRESS — ${nft.completedCases}/12`
-                    : "ONE ATTEMPT AVAILABLE";
-            const attemptUsed = nft.attemptStatus === "completed";
-            return `<button class="nft-option${attemptUsed ? " attempt-used" : ""}" data-nft-index="${index}">
-                ${nftImageMarkup(nft, false)}
-                ${attemptUsed ? `<span class="attempt-seal"><b>VOSS</b><em>ATTEMPT USED</em></span>` : ""}
-                <span class="nft-candidate-number candidate-nft-label">CANDIDATE #${escapeHTML(nft.number)}</span>
-                <small>${attemptLabel}</small>
-            </button>`;
-        }).join("")}</div>`;
+        const originalNfts = scan.nfts;
+        let activeFilter = "all";
+        let searchTerm = "";
 
-        selection.querySelectorAll(".nft-option").forEach(button => {
-            button.onclick = () => {
-                selection.querySelectorAll(".nft-option").forEach(item => item.classList.remove("selected"));
-                button.classList.add("selected");
-                selectedNft = scan.nfts[Number(button.dataset.nftIndex)];
-                candidateNumber = selectedNft.number;
-                testShortcutClicks = 0;
-                const actions = document.getElementById("gateActions");
-                if (selectedNft.attemptStatus === "completed") {
-                    actions.innerHTML = `<div class="gate-status">FINAL ALREADY RECORDED. THIS NFT HAS NO ATTEMPTS REMAINING.</div>`;
-                    return;
-                }
-                actions.innerHTML = selectedNft.attemptStatus === "started"
-                    ? `<button id="continueBtn" style="text-align:center;">CONTINUE — ${selectedNft.completedCases}/12 COMPLETED</button>`
-                    : `<button id="beginBtn" style="text-align:center;">BEGIN SIMULATION — USE ONLY ATTEMPT</button>`;
-                const continueBtn = document.getElementById("continueBtn");
-                if (continueBtn) continueBtn.onclick = async () => {
-                    continueBtn.disabled = true;
-                    continueBtn.textContent = "RESTORING RECORDED PROGRESS...";
-                    try {
-                        await resumeNftAttempt();
-                        preloadSelectedNft();
-                        playBeep(720, 60);
-                        render();
-                    } catch (error) {
-                        continueBtn.disabled = false;
-                        continueBtn.textContent = `RESTORE FAILED — ${error.message || "RETRY"}`;
+        const matchesFilter = nft => {
+            if (activeFilter === "all") return true;
+            if (activeFilter === "available") return (nft.attemptStatus || "available") === "available";
+            if (activeFilter === "inprogress") return (nft.attemptStatus || "available") === "started";
+            if (activeFilter === "used") return (nft.attemptStatus || "available") === "completed";
+            return true;
+        };
+        const matchesSearch = nft => {
+            if (!searchTerm) return true;
+            const q = searchTerm.toLowerCase();
+            const num = String(nft.number ?? "").toLowerCase();
+            const oid = String(nft.objectId ?? "").toLowerCase();
+            return num.includes(q) || oid.includes(q);
+        };
+        const getFiltered = () => originalNfts.filter(n => matchesFilter(n) && matchesSearch(n));
+
+        const renderList = nfts => {
+            const selector = selection.querySelector(".nft-selector");
+            if (!selector) return;
+            if (nfts.length === 0) {
+                selector.innerHTML = `<div class="nft-empty" style="color:#888;padding:18px;text-align:center;letter-spacing:1px;">NO NFTS MATCH YOUR FILTER.</div>`;
+                return;
+            }
+            selector.innerHTML = nfts.map(nft => {
+                const attemptLabel = nft.attemptStatus === "completed"
+                    ? "COMPLETED — NO ATTEMPTS REMAINING"
+                    : nft.attemptStatus === "started"
+                        ? `IN PROGRESS — ${nft.completedCases}/12`
+                        : "ONE ATTEMPT AVAILABLE";
+                const attemptUsed = nft.attemptStatus === "completed";
+                return `<button class="nft-option${attemptUsed ? " attempt-used" : ""}">
+                    ${nftImageMarkup(nft, false)}
+                    ${attemptUsed ? `<span class="attempt-seal"><b>VOSS</b><em>ATTEMPT USED</em></span>` : ""}
+                    <span class="nft-candidate-number candidate-nft-label">CANDIDATE #${escapeHTML(nft.number)}</span>
+                    <small>${attemptLabel}</small>
+                </button>`;
+            }).join("");
+
+            selector.querySelectorAll(".nft-option").forEach((button, i) => {
+                const nft = nfts[i];
+                button.onclick = () => {
+                    selection.querySelectorAll(".nft-option").forEach(item => item.classList.remove("selected"));
+                    button.classList.add("selected");
+                    selectedNft = nft;
+                    candidateNumber = nft.number;
+                    testShortcutClicks = 0;
+                    const actions = document.getElementById("gateActions");
+                    if (nft.attemptStatus === "completed") {
+                        actions.innerHTML = `<div class="gate-status">FINAL ALREADY RECORDED. THIS NFT HAS NO ATTEMPTS REMAINING.</div>`;
+                        return;
                     }
+                    actions.innerHTML = nft.attemptStatus === "started"
+                        ? `<button id="continueBtn" style="text-align:center;">CONTINUE — ${nft.completedCases}/12 COMPLETED</button>`
+                        : `<button id="beginBtn" style="text-align:center;">BEGIN SIMULATION — USE ONLY ATTEMPT</button>`;
+                    const continueBtn = document.getElementById("continueBtn");
+                    if (continueBtn) continueBtn.onclick = async () => {
+                        continueBtn.disabled = true;
+                        continueBtn.textContent = "RESTORING RECORDED PROGRESS...";
+                        try {
+                            await resumeNftAttempt();
+                            preloadSelectedNft();
+                            playBeep(720, 60);
+                            render();
+                        } catch (error) {
+                            continueBtn.disabled = false;
+                            continueBtn.textContent = `RESTORE FAILED — ${error.message || "RETRY"}`;
+                        }
+                    };
+                    const beginBtn = document.getElementById("beginBtn");
+                    if (beginBtn) beginBtn.onclick = async event => {
+                        event.stopPropagation();
+                        beginBtn.disabled = true;
+                        beginBtn.textContent = "RESERVING NFT ATTEMPT...";
+                        try {
+                            await startNftAttempt();
+                            preloadSelectedNft();
+                            clearSave();
+                            resetState();
+                            isTestMode = false;
+                            saveState();
+                            await recordAttemptProgress();
+                            playBeep(850, 80);
+                            render();
+                        } catch (error) {
+                            beginBtn.disabled = false;
+                            beginBtn.textContent = `ATTEMPT UNAVAILABLE — ${error.message || "RETRY"}`;
+                        }
+                    };
                 };
-                const beginBtn = document.getElementById("beginBtn");
-                if (beginBtn) beginBtn.onclick = async event => {
-                    event.stopPropagation();
-                    beginBtn.disabled = true;
-                    beginBtn.textContent = "RESERVING NFT ATTEMPT...";
-                    try {
-                        await startNftAttempt();
-                        preloadSelectedNft();
-                        clearSave();
-                        resetState();
-                        isTestMode = false;
-                        saveState();
-                        await recordAttemptProgress();
-                        playBeep(850, 80);
-                        render();
-                    } catch (error) {
-                        beginBtn.disabled = false;
-                        beginBtn.textContent = `ATTEMPT UNAVAILABLE — ${error.message || "RETRY"}`;
-                    }
-                };
-            };
+            });
+        };
+
+        const applyFilters = () => {
+            const filtered = getFiltered();
+            const countEl = selection.querySelector("#nftFilterCount");
+            if (countEl) countEl.textContent = `${filtered.length} / ${originalNfts.length}`;
+            renderList(filtered);
+        };
+
+        const setFilter = value => {
+            activeFilter = value;
+            selection.querySelectorAll(".nft-filter-btn").forEach(b => {
+                b.classList.toggle("active", b.dataset.filter === value);
+            });
+            applyFilters();
+        };
+
+        setStatus(`OWNERSHIP VERIFIED. SELECT ONE OF ${scan.nfts.length} NFT${scan.nfts.length === 1 ? "" : "S"} AS YOUR CANDIDATE.`);
+        selection.innerHTML = `
+            <div class="nft-toolbar">
+                <input id="nftSearch" class="nft-search" type="text" placeholder="SEARCH CANDIDATE # OR OBJECT ID..." autocomplete="off" />
+                <div class="nft-filters">
+                    <button class="nft-filter-btn active" data-filter="all">ALL</button>
+                    <button class="nft-filter-btn" data-filter="available">AVAILABLE</button>
+                    <button class="nft-filter-btn" data-filter="inprogress">IN PROGRESS</button>
+                    <button class="nft-filter-btn" data-filter="used">USED</button>
+                    <span id="nftFilterCount" class="nft-filter-count"></span>
+                </div>
+            </div>
+            <div class="gate-actions" id="gateActions"></div>
+            <div class="nft-selector"></div>`;
+
+        const searchInput = selection.querySelector("#nftSearch");
+        searchInput.addEventListener("input", e => {
+            searchTerm = e.target.value.trim();
+            applyFilters();
         });
+        selection.querySelectorAll(".nft-filter-btn").forEach(btn => {
+            btn.onclick = () => setFilter(btn.dataset.filter);
+        });
+
+        applyFilters();
     };
 
     const showWallets = () => {
